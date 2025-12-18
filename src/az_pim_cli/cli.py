@@ -245,10 +245,19 @@ def activate_role(
 
         # Check if role is a number reference (e.g., "#1" or "1")
         if role.startswith("#") or role.isdigit():
-            role_num = int(role.lstrip("#"))
+            try:
+                role_num = int(role.lstrip("#"))
+            except ValueError:
+                console.print(
+                    f"[red]Invalid role number format: '{role}'. Expected a number like '1' or '#1'.[/red]"
+                )
+                raise typer.Exit(1)
+
             console.print(f"[blue]Looking up role #{role_num} from recent list...[/blue]")
 
-            # Fetch roles
+            # Fetch roles - note: this fetches all roles to ensure consistent ordering
+            # with the list command. For better performance, run 'az-pim list' first
+            # to see available roles, then activate by number.
             if resource:
                 if not scope:
                     subscription_id = auth.get_subscription_id()
