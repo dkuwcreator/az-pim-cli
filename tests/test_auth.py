@@ -2,10 +2,8 @@
 
 import os
 import socket
-import pytest
 from unittest.mock import patch, MagicMock
 from az_pim_cli.auth import should_use_ipv4_only, ipv4_only_context, AzureAuth
-from az_pim_cli.exceptions import AuthenticationError
 
 
 def test_should_use_ipv4_only_default():
@@ -184,4 +182,3 @@ def test_get_tenant_id_from_token():
     with patch.object(auth, "get_token", return_value=mock_token):
         tid = auth.get_tenant_id()
         assert tid == "tenant-456"
-
