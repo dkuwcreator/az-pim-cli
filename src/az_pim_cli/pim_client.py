@@ -99,7 +99,10 @@ class PIMClient:
                 
                 # Handle specific HTTP errors
                 if response.status_code == 403:
-                    principal_id = self.auth.get_user_object_id() if hasattr(self.auth, 'get_user_object_id') else "unknown"
+                    try:
+                        principal_id = self.auth.get_user_object_id()
+                    except Exception:
+                        principal_id = "unknown"
                     raise PermissionError(
                         f"Permission denied for {operation}. "
                         f"Principal ID: {principal_id}. "
@@ -120,7 +123,7 @@ class PIMClient:
                     return response.json()
                 except ValueError as e:
                     raise ParsingError(
-                        f"Failed to parse JSON response for {operation}",
+                        f"Failed to parse JSON response for {operation}: {str(e)}",
                         response_data=response.text[:500]
                     )
                     
