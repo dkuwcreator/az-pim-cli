@@ -1,7 +1,6 @@
 """Main CLI module for Azure PIM CLI."""
 
 import os
-from pathlib import Path
 from typing import Optional
 
 import typer
@@ -12,7 +11,12 @@ from az_pim_cli.auth import AzureAuth
 from az_pim_cli.pim_client import PIMClient
 from az_pim_cli.config import Config
 from az_pim_cli.models import normalize_roles, RoleSource
-from az_pim_cli.exceptions import PIMError, NetworkError, PermissionError as PIMPermissionError, AuthenticationError
+from az_pim_cli.exceptions import (
+    PIMError,
+    NetworkError,
+    PermissionError as PIMPermissionError,
+    AuthenticationError,
+)
 
 app = typer.Typer(
     name="az-pim",
@@ -56,9 +60,15 @@ def get_duration_string(hours: Optional[float] = None) -> str:
 
 @app.command("list")
 def list_roles(
-    resource: bool = typer.Option(False, "--resource", "-r", help="List resource roles instead of directory roles"),
-    scope: Optional[str] = typer.Option(None, "--scope", "-s", help="Scope for resource roles (e.g., subscriptions/{id})"),
-    full_scope: bool = typer.Option(False, "--full-scope", help="Show full scope paths instead of shortened versions"),
+    resource: bool = typer.Option(
+        False, "--resource", "-r", help="List resource roles instead of directory roles"
+    ),
+    scope: Optional[str] = typer.Option(
+        None, "--scope", "-s", help="Scope for resource roles (e.g., subscriptions/{id})"
+    ),
+    full_scope: bool = typer.Option(
+        False, "--full-scope", help="Show full scope paths instead of shortened versions"
+    ),
     limit: Optional[int] = typer.Option(None, "--limit", "-l", help="Limit number of results"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
 ) -> None:
@@ -80,7 +90,7 @@ def list_roles(
         else:
             roles_data = client.list_role_assignments(limit=limit)
             console.print("\n[bold green]Eligible Azure AD Roles[/bold green]")
-        
+
         # Show backend info in verbose mode
         if verbose:
             backend = os.environ.get("AZ_PIM_BACKEND", "ARM")
@@ -93,7 +103,7 @@ def list_roles(
         if not roles:
             console.print("[yellow]No eligible roles found.[/yellow]")
             return
-        
+
         console.print(f"[dim]Found {len(roles)} role(s)[/dim]\n")
 
         table = Table(show_header=True, header_style="bold magenta")
@@ -118,7 +128,9 @@ def list_roles(
         if e.endpoint:
             console.print(f"[dim]Endpoint: {e.endpoint}[/dim]")
         if e.suggest_ipv4:
-            console.print("[yellow]💡 Tip:[/yellow] If you're experiencing DNS issues, try enabling IPv4-only mode:")
+            console.print(
+                "[yellow]💡 Tip:[/yellow] If you're experiencing DNS issues, try enabling IPv4-only mode:"
+            )
             console.print("   export AZ_PIM_IPV4_ONLY=1")
         raise typer.Exit(1)
     except PIMPermissionError as e:
@@ -135,6 +147,7 @@ def list_roles(
         console.print(f"[bold red]Unexpected Error:[/bold red] {str(e)}")
         if verbose:
             import traceback
+
             console.print("[dim]" + traceback.format_exc() + "[/dim]")
         raise typer.Exit(1)
 
@@ -143,8 +156,12 @@ def list_roles(
 def activate_role(
     role: str = typer.Argument(..., help="Role name or ID to activate"),
     duration: Optional[float] = typer.Option(None, "--duration", "-d", help="Duration in hours"),
-    justification: Optional[str] = typer.Option(None, "--justification", "-j", help="Justification for activation"),
-    resource: bool = typer.Option(False, "--resource", "-r", help="Activate resource role instead of directory role"),
+    justification: Optional[str] = typer.Option(
+        None, "--justification", "-j", help="Justification for activation"
+    ),
+    resource: bool = typer.Option(
+        False, "--resource", "-r", help="Activate resource role instead of directory role"
+    ),
     scope: Optional[str] = typer.Option(None, "--scope", "-s", help="Scope for resource roles"),
     ticket: Optional[str] = typer.Option(None, "--ticket", "-t", help="Ticket number"),
     ticket_system: Optional[str] = typer.Option(None, "--ticket-system", help="Ticket system name"),
@@ -173,7 +190,9 @@ def activate_role(
             role_id = role
 
         duration_str = get_duration_string(duration)
-        justification = justification or config.get_default("justification") or "Requested via az-pim-cli"
+        justification = (
+            justification or config.get_default("justification") or "Requested via az-pim-cli"
+        )
 
         console.print(f"\n[bold blue]Activating role:[/bold blue] {role_id}")
         console.print(f"[blue]Duration:[/blue] {duration_str}")
@@ -233,6 +252,7 @@ def activate_role(
         console.print(f"[bold red]Unexpected Error:[/bold red] {str(e)}")
         if verbose:
             import traceback
+
             console.print("[dim]" + traceback.format_exc() + "[/dim]")
         raise typer.Exit(1)
 
@@ -255,7 +275,7 @@ def view_history(
             console.print("[yellow]No activation history found.[/yellow]")
             return
 
-        console.print(f"\n[bold green]Activation History[/bold green]\n")
+        console.print("\n[bold green]Activation History[/bold green]\n")
 
         table = Table(show_header=True, header_style="bold magenta")
         table.add_column("Role Name", style="cyan")
@@ -282,7 +302,9 @@ def view_history(
 @app.command("approve")
 def approve_request(
     request_id: str = typer.Argument(..., help="Request ID to approve"),
-    justification: Optional[str] = typer.Option(None, "--justification", "-j", help="Justification for approval"),
+    justification: Optional[str] = typer.Option(
+        None, "--justification", "-j", help="Justification for approval"
+    ),
 ) -> None:
     """Approve a pending role activation request."""
     try:
@@ -294,7 +316,7 @@ def approve_request(
         console.print(f"\n[bold blue]Approving request:[/bold blue] {request_id}")
         console.print(f"[blue]Justification:[/blue] {justification}\n")
 
-        result = client.approve_request(request_id, justification)
+        client.approve_request(request_id, justification)
 
         console.print("[bold green]✓ Request approved successfully![/bold green]")
 
@@ -318,7 +340,7 @@ def list_pending() -> None:
             console.print("[yellow]No pending approval requests found.[/yellow]")
             return
 
-        console.print(f"\n[bold green]Pending Approval Requests[/bold green]\n")
+        console.print("\n[bold green]Pending Approval Requests[/bold green]\n")
 
         table = Table(show_header=True, header_style="bold magenta")
         table.add_column("Request ID", style="cyan")
@@ -351,8 +373,12 @@ def add_alias(
     name: str = typer.Argument(..., help="Alias name"),
     role: str = typer.Argument(..., help="Role name or ID"),
     duration: Optional[str] = typer.Option(None, "--duration", "-d", help="Duration (e.g., PT8H)"),
-    justification: Optional[str] = typer.Option(None, "--justification", "-j", help="Justification"),
-    scope: Optional[str] = typer.Option(None, "--scope", "-s", help="Scope (directory, subscription)"),
+    justification: Optional[str] = typer.Option(
+        None, "--justification", "-j", help="Justification"
+    ),
+    scope: Optional[str] = typer.Option(
+        None, "--scope", "-s", help="Scope (directory, subscription)"
+    ),
     subscription: Optional[str] = typer.Option(None, "--subscription", help="Subscription ID"),
 ) -> None:
     """Add a new alias."""
@@ -378,7 +404,9 @@ def remove_alias(name: str = typer.Argument(..., help="Alias name to remove")) -
     try:
         config = Config()
         if config.remove_alias(name):
-            console.print(f"[bold green]✓ Alias '[bold]{name}[/bold]' removed successfully![/bold green]")
+            console.print(
+                f"[bold green]✓ Alias '[bold]{name}[/bold]' removed successfully![/bold green]"
+            )
         else:
             console.print(f"[yellow]Alias '[bold]{name}[/bold]' not found.[/yellow]")
     except Exception as e:
@@ -424,7 +452,9 @@ def version() -> None:
     """Show version information."""
     from az_pim_cli import __version__
 
-    console.print(f"[bold blue]az-pim-cli[/bold blue] version [bold green]{__version__}[/bold green]")
+    console.print(
+        f"[bold blue]az-pim-cli[/bold blue] version [bold green]{__version__}[/bold green]"
+    )
 
 
 if __name__ == "__main__":

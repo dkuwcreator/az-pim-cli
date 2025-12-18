@@ -8,7 +8,6 @@ import requests
 
 from az_pim_cli.auth import AzureAuth, ipv4_only_context, should_use_ipv4_only
 from az_pim_cli.exceptions import NetworkError, PermissionError, ParsingError
-from az_pim_cli.models import RoleSource
 
 
 class PIMClient:
@@ -29,7 +28,7 @@ class PIMClient:
         self.auth = auth or AzureAuth()
         self.verbose = verbose
         self._backend = os.environ.get("AZ_PIM_BACKEND", "ARM").upper()
-        
+
         if self.verbose:
             print(f"[DEBUG] PIM Client initialized with backend: {self._backend}")
             print(f"[DEBUG] IPv4-only mode: {should_use_ipv4_only()}")
@@ -49,7 +48,7 @@ class PIMClient:
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
         }
-    
+
     def _make_request(
         self,
         method: str,
@@ -57,11 +56,11 @@ class PIMClient:
         headers: Dict[str, str],
         params: Optional[Dict[str, Any]] = None,
         json_data: Optional[Dict[str, Any]] = None,
-        operation: str = "API request"
+        operation: str = "API request",
     ) -> Dict[str, Any]:
         """
         Make an HTTP request with enhanced error handling.
-        
+
         Args:
             method: HTTP method (GET, POST, PUT)
             url: Request URL
@@ -69,34 +68,39 @@ class PIMClient:
             params: Query parameters
             json_data: JSON body
             operation: Description of operation for error messages
-            
+
         Returns:
             Response JSON data
-            
+
         Raises:
             NetworkError: For DNS, timeout, and connection errors
             PermissionError: For 403 authorization errors
             ParsingError: For response parsing errors
         """
+
         def do_request():
             try:
                 if self.verbose:
                     print(f"[DEBUG] {method} {url}")
                     if params:
                         print(f"[DEBUG] Params: {params}")
-                
+
                 if method == "GET":
                     response = requests.get(url, headers=headers, params=params, timeout=30)
                 elif method == "POST":
-                    response = requests.post(url, headers=headers, params=params, json=json_data, timeout=30)
+                    response = requests.post(
+                        url, headers=headers, params=params, json=json_data, timeout=30
+                    )
                 elif method == "PUT":
-                    response = requests.put(url, headers=headers, params=params, json=json_data, timeout=30)
+                    response = requests.put(
+                        url, headers=headers, params=params, json=json_data, timeout=30
+                    )
                 else:
                     raise ValueError(f"Unsupported HTTP method: {method}")
-                
+
                 if self.verbose:
                     print(f"[DEBUG] Response status: {response.status_code}")
-                
+
                 # Handle specific HTTP errors
                 if response.status_code == 403:
                     try:
@@ -108,53 +112,51 @@ class PIMClient:
                         f"Principal ID: {principal_id}. "
                         f"You may be missing required permissions.",
                         endpoint=url,
-                        required_permissions="RoleManagement.ReadWrite.Directory or equivalent Azure RBAC permissions"
+                        required_permissions="RoleManagement.ReadWrite.Directory or equivalent Azure RBAC permissions",
                     )
                 elif response.status_code == 401:
                     from az_pim_cli.exceptions import AuthenticationError
+
                     raise AuthenticationError(
                         f"Authentication failed for {operation}",
-                        suggestion="Run 'az login' to refresh your authentication"
+                        suggestion="Run 'az login' to refresh your authentication",
                     )
-                
+
                 response.raise_for_status()
-                
+
                 try:
                     return response.json()
                 except ValueError as e:
                     raise ParsingError(
                         f"Failed to parse JSON response for {operation}: {str(e)}",
-                        response_data=response.text[:500]
+                        response_data=response.text[:500],
                     )
-                    
+
             except requests.exceptions.ConnectionError as e:
                 error_msg = str(e).lower()
                 suggest_ipv4 = "getaddrinfo failed" in error_msg or "name resolution" in error_msg
-                
+
                 hint = ""
                 if suggest_ipv4:
                     hint = " Try enabling IPv4-only mode: export AZ_PIM_IPV4_ONLY=1"
-                
+
                 raise NetworkError(
                     f"Connection error during {operation}: {str(e)}{hint}",
                     endpoint=url,
-                    suggest_ipv4=suggest_ipv4
+                    suggest_ipv4=suggest_ipv4,
                 )
             except requests.exceptions.Timeout:
                 raise NetworkError(
                     f"Request timeout during {operation}. Check your network connection.",
-                    endpoint=url
+                    endpoint=url,
                 )
             except requests.exceptions.RequestException as e:
-                if hasattr(e, 'response') and e.response is not None:
+                if hasattr(e, "response") and e.response is not None:
                     if e.response.status_code == 403:
                         # Already handled above, but catch if raise_for_status is called
                         raise
-                raise NetworkError(
-                    f"Network error during {operation}: {str(e)}",
-                    endpoint=url
-                )
-        
+                raise NetworkError(f"Network error during {operation}: {str(e)}", endpoint=url)
+
         # Use IPv4-only context if enabled
         if should_use_ipv4_only():
             with ipv4_only_context():
@@ -163,9 +165,7 @@ class PIMClient:
             return do_request()
 
     def list_role_assignments(
-        self, 
-        principal_id: Optional[str] = None,
-        limit: Optional[int] = None
+        self, principal_id: Optional[str] = None, limit: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         """
         List Azure AD role assignments for the user.
@@ -183,44 +183,40 @@ class PIMClient:
         url = f"{self.ARM_API_BASE}/providers/Microsoft.Authorization/roleEligibilityScheduleInstances"
         params = {
             "api-version": "2020-10-01",
-            "$filter": "asTarget()"  # Gets roles for the current authenticated user
+            "$filter": "asTarget()",  # Gets roles for the current authenticated user
         }
 
         headers = self._get_headers("https://management.azure.com/.default")
-        
+
         all_results = []
         while True:
             data = self._make_request(
-                "GET", url, headers, params,
-                operation="list role assignments"
+                "GET", url, headers, params, operation="list role assignments"
             )
-            
+
             values = data.get("value", [])
             all_results.extend(values)
-            
+
             if self.verbose:
                 print(f"[DEBUG] Retrieved {len(values)} roles (total: {len(all_results)})")
-            
+
             # Check if we've hit the limit
             if limit and len(all_results) >= limit:
                 all_results = all_results[:limit]
                 break
-            
+
             # Handle pagination
             next_link = data.get("nextLink")
             if not next_link:
                 break
-            
+
             url = next_link
             params = {}  # nextLink already includes params
-        
+
         return all_results
 
     def list_resource_role_assignments(
-        self, 
-        scope: str, 
-        principal_id: Optional[str] = None,
-        limit: Optional[int] = None
+        self, scope: str, principal_id: Optional[str] = None, limit: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         """
         List Azure resource role assignments.
@@ -240,33 +236,36 @@ class PIMClient:
         params = {"api-version": "2020-10-01", "$filter": f"principalId eq '{principal_id}'"}
 
         headers = self._get_headers("https://management.azure.com/.default")
-        
+
         all_results = []
         while True:
             data = self._make_request(
-                "GET", url, headers, params,
-                operation=f"list resource role assignments for scope {scope}"
+                "GET",
+                url,
+                headers,
+                params,
+                operation=f"list resource role assignments for scope {scope}",
             )
-            
+
             values = data.get("value", [])
             all_results.extend(values)
-            
+
             if self.verbose:
                 print(f"[DEBUG] Retrieved {len(values)} resource roles (total: {len(all_results)})")
-            
+
             # Check if we've hit the limit
             if limit and len(all_results) >= limit:
                 all_results = all_results[:limit]
                 break
-            
+
             # Handle pagination
             next_link = data.get("nextLink")
             if not next_link:
                 break
-            
+
             url = next_link
             params = {}  # nextLink already includes params
-        
+
         return all_results
 
     def request_role_activation(
@@ -313,10 +312,9 @@ class PIMClient:
             payload["ticketInfo"] = {"ticketNumber": ticket_number, "ticketSystem": ticket_system}
 
         headers = self._get_headers()
-        
+
         return self._make_request(
-            "POST", url, headers, json_data=payload,
-            operation="activate Azure AD role"
+            "POST", url, headers, json_data=payload, operation="activate Azure AD role"
         )
 
     def request_resource_role_activation(
@@ -370,10 +368,14 @@ class PIMClient:
 
         params = {"api-version": "2020-10-01"}
         headers = self._get_headers("https://management.azure.com/.default")
-        
+
         return self._make_request(
-            "PUT", url, headers, params, json_data=payload,
-            operation=f"activate resource role on scope {scope}"
+            "PUT",
+            url,
+            headers,
+            params,
+            json_data=payload,
+            operation=f"activate resource role on scope {scope}",
         )
 
     def list_pending_approvals(self, principal_id: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -393,10 +395,7 @@ class PIMClient:
         params = {"$filter": "status eq 'PendingApproval'"}
 
         headers = self._get_headers()
-        data = self._make_request(
-            "GET", url, headers, params,
-            operation="list pending approvals"
-        )
+        data = self._make_request("GET", url, headers, params, operation="list pending approvals")
 
         return data.get("value", [])
 
@@ -418,10 +417,9 @@ class PIMClient:
         payload = {"justification": justification}
 
         headers = self._get_headers()
-        
+
         return self._make_request(
-            "POST", url, headers, json_data=payload,
-            operation=f"approve request {request_id}"
+            "POST", url, headers, json_data=payload, operation=f"approve request {request_id}"
         )
 
     def list_activation_history(
@@ -444,9 +442,6 @@ class PIMClient:
         params = {"$filter": f"principalId eq '{principal_id}'", "$expand": "roleDefinition"}
 
         headers = self._get_headers()
-        data = self._make_request(
-            "GET", url, headers, params,
-            operation="list activation history"
-        )
+        data = self._make_request("GET", url, headers, params, operation="list activation history")
 
         return data.get("value", [])

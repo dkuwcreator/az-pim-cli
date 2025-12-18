@@ -3,12 +3,11 @@
 Environment Variables:
     AZ_PIM_IPV4_ONLY: Set to '1', 'true', or 'yes' to force IPv4-only DNS resolution.
                       Useful for networks with IPv6 connectivity issues.
-    
+
     AZ_PIM_BACKEND: Choose API backend - 'ARM' (default) or 'GRAPH'.
                     ARM backend aligns with Azure Portal and requires fewer permissions.
 """
 
-import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 

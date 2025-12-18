@@ -19,7 +19,7 @@ def test_should_use_ipv4_only_enabled():
     for value in test_values:
         os.environ["AZ_PIM_IPV4_ONLY"] = value
         assert should_use_ipv4_only() is True, f"Failed for value: {value}"
-    
+
     # Clean up
     os.environ.pop("AZ_PIM_IPV4_ONLY", None)
 
@@ -30,7 +30,7 @@ def test_should_use_ipv4_only_disabled():
     for value in test_values:
         os.environ["AZ_PIM_IPV4_ONLY"] = value
         assert should_use_ipv4_only() is False, f"Failed for value: {value}"
-    
+
     # Clean up
     os.environ.pop("AZ_PIM_IPV4_ONLY", None)
 
@@ -38,17 +38,17 @@ def test_should_use_ipv4_only_disabled():
 def test_ipv4_only_context():
     """Test IPv4-only context manager."""
     original_getaddrinfo = socket.getaddrinfo
-    
+
     # Before context
     assert socket.getaddrinfo is original_getaddrinfo
-    
+
     # Inside context
     with ipv4_only_context():
         assert socket.getaddrinfo is not original_getaddrinfo
         # Test that it forces IPv4
         # We can't easily test the actual behavior without network calls,
         # but we can verify the function was replaced
-    
+
     # After context (should be restored)
     assert socket.getaddrinfo is original_getaddrinfo
 
@@ -56,13 +56,13 @@ def test_ipv4_only_context():
 def test_ipv4_only_context_exception_handling():
     """Test that IPv4 context restores socket.getaddrinfo even on exception."""
     original_getaddrinfo = socket.getaddrinfo
-    
+
     try:
         with ipv4_only_context():
             assert socket.getaddrinfo is not original_getaddrinfo
             raise ValueError("Test exception")
     except ValueError:
         pass
-    
+
     # Should be restored even after exception
     assert socket.getaddrinfo is original_getaddrinfo

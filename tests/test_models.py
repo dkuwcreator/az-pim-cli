@@ -22,19 +22,19 @@ def test_normalize_arm_role():
             "expandedProperties": {
                 "roleDefinition": {
                     "displayName": "Contributor",
-                    "id": "/providers/Microsoft.Authorization/roleDefinitions/role-123"
+                    "id": "/providers/Microsoft.Authorization/roleDefinitions/role-123",
                 },
                 "scope": {
                     "displayName": "Test Subscription",
                     "id": "/subscriptions/sub-789",
-                    "type": "subscription"
-                }
-            }
-        }
+                    "type": "subscription",
+                },
+            },
+        },
     }
-    
+
     normalized = normalize_arm_role(arm_response)
-    
+
     assert normalized.name == "Contributor"
     assert normalized.id == "/providers/Microsoft.Authorization/roleDefinitions/role-123"
     assert normalized.status == "Active"
@@ -50,14 +50,11 @@ def test_normalize_graph_role():
         "principalId": "user-456",
         "directoryScopeId": "/",
         "status": "Provisioned",
-        "roleDefinition": {
-            "displayName": "Global Administrator",
-            "id": "role-123"
-        }
+        "roleDefinition": {"displayName": "Global Administrator", "id": "role-123"},
     }
-    
+
     normalized = normalize_graph_role(graph_response)
-    
+
     assert normalized.name == "Global Administrator"
     assert normalized.id == "role-123"
     assert normalized.status == "Provisioned"
@@ -73,9 +70,7 @@ def test_normalize_roles_arm():
                 "roleDefinitionId": "role-1",
                 "status": "Active",
                 "scope": "/",
-                "expandedProperties": {
-                    "roleDefinition": {"displayName": "Role 1"}
-                }
+                "expandedProperties": {"roleDefinition": {"displayName": "Role 1"}},
             }
         },
         {
@@ -83,15 +78,13 @@ def test_normalize_roles_arm():
                 "roleDefinitionId": "role-2",
                 "status": "Active",
                 "scope": "/",
-                "expandedProperties": {
-                    "roleDefinition": {"displayName": "Role 2"}
-                }
+                "expandedProperties": {"roleDefinition": {"displayName": "Role 2"}},
             }
-        }
+        },
     ]
-    
+
     normalized = normalize_roles(arm_responses, RoleSource.ARM)
-    
+
     assert len(normalized) == 2
     assert normalized[0].name == "Role 1"
     assert normalized[1].name == "Role 2"
@@ -105,11 +98,11 @@ def test_normalized_role_to_dict():
         id="role-123",
         status="Active",
         scope="/subscriptions/sub-789",
-        source=RoleSource.ARM
+        source=RoleSource.ARM,
     )
-    
+
     role_dict = role.to_dict()
-    
+
     assert role_dict["name"] == "Test Role"
     assert role_dict["id"] == "role-123"
     assert role_dict["status"] == "Active"
@@ -124,48 +117,36 @@ def test_get_short_scope():
         name="Test",
         id="id",
         status="Active",
-        scope="/subscriptions/12345678-1234-1234-1234-123456789abc"
+        scope="/subscriptions/12345678-1234-1234-1234-123456789abc",
     )
     assert "sub:12345678..." in role1.get_short_scope()
-    
+
     # Test resource group scope
     role2 = NormalizedRole(
         name="Test",
         id="id",
         status="Active",
-        scope="/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg"
+        scope="/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg",
     )
     short = role2.get_short_scope()
     assert "sub:12345678..." in short
     assert "rg:my-rg" in short
-    
+
     # Test root scope
-    role3 = NormalizedRole(
-        name="Test",
-        id="id",
-        status="Active",
-        scope="/"
-    )
+    role3 = NormalizedRole(name="Test", id="id", status="Active", scope="/")
     assert role3.get_short_scope() == "/"
-    
+
     # Test empty scope
-    role4 = NormalizedRole(
-        name="Test",
-        id="id",
-        status="Active",
-        scope=""
-    )
+    role4 = NormalizedRole(name="Test", id="id", status="Active", scope="")
     assert role4.get_short_scope() == "/"
 
 
 def test_normalize_arm_role_with_missing_fields():
     """Test normalizing ARM response with missing fields."""
-    arm_response = {
-        "properties": {}
-    }
-    
+    arm_response = {"properties": {}}
+
     normalized = normalize_arm_role(arm_response)
-    
+
     assert normalized.name == "Unknown"
     assert normalized.id == ""
     assert normalized.status == "Active"
@@ -174,9 +155,9 @@ def test_normalize_arm_role_with_missing_fields():
 def test_normalize_graph_role_with_missing_fields():
     """Test normalizing Graph response with missing fields."""
     graph_response = {}
-    
+
     normalized = normalize_graph_role(graph_response)
-    
+
     assert normalized.name == "Unknown"
     assert normalized.id == ""
     assert normalized.status == "Provisioned"

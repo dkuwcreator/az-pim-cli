@@ -20,16 +20,17 @@ def ipv4_only_context():
     """
     Context manager that temporarily forces IPv4-only DNS resolution.
     This works around DNS resolution issues with IPv6 on some networks.
-    
+
     Usage:
         with ipv4_only_context():
             # Network calls here will use IPv4 only
             response = requests.get(url)
     """
+
     def _ipv4_only_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
         """Force IPv4 resolution to avoid IPv6 DNS issues"""
         return _original_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
-    
+
     original = socket.getaddrinfo
     socket.getaddrinfo = _ipv4_only_getaddrinfo
     try:
@@ -42,7 +43,7 @@ def should_use_ipv4_only() -> bool:
     """
     Check if IPv4-only mode should be enabled.
     Can be controlled via AZ_PIM_IPV4_ONLY environment variable.
-    
+
     Returns:
         True if IPv4-only mode is enabled
     """
@@ -67,16 +68,16 @@ class AzureAuth:
 
         Returns:
             Access token string
-            
+
         Raises:
             AuthenticationError: If token cannot be acquired with actionable suggestions
         """
         from az_pim_cli.exceptions import AuthenticationError
-        
+
         try:
             # Convert scope to resource URL (remove /.default suffix)
             resource = scope.replace("/.default", "")
-            
+
             # Get token directly from Azure CLI - uses local cache, works offline
             result = subprocess.run(
                 ["az", "account", "get-access-token", "--resource", resource, "-o", "json"],
@@ -91,12 +92,12 @@ class AzureAuth:
             if "az login" in stderr or "not logged in" in stderr.lower():
                 raise AuthenticationError(
                     "Not logged in to Azure CLI",
-                    suggestion="Run 'az login' to authenticate with Azure"
+                    suggestion="Run 'az login' to authenticate with Azure",
                 )
             elif "expired" in stderr.lower() or "refresh" in stderr.lower():
                 raise AuthenticationError(
                     "Azure CLI token has expired",
-                    suggestion="Run 'az login' to refresh your authentication"
+                    suggestion="Run 'az login' to refresh your authentication",
                 )
             else:
                 # Try fallback methods before giving up
@@ -104,24 +105,24 @@ class AzureAuth:
         except FileNotFoundError:
             raise AuthenticationError(
                 "Azure CLI not found",
-                suggestion="Install Azure CLI from https://docs.microsoft.com/cli/azure/install-azure-cli"
+                suggestion="Install Azure CLI from https://docs.microsoft.com/cli/azure/install-azure-cli",
             )
         except json.JSONDecodeError:
             raise AuthenticationError(
                 "Failed to parse Azure CLI token response",
-                suggestion="Try running 'az login' to refresh your authentication"
+                suggestion="Try running 'az login' to refresh your authentication",
             )
         except Exception:
             # Try fallback methods
             pass
-        
+
         # Fallback to azure.identity library methods
         try:
             if self._cli_credential is None:
                 self._cli_credential = AzureCliCredential()
             token = self._cli_credential.get_token(scope)
             return token.token
-        except Exception as e:
+        except Exception:
             # Last resort: DefaultAzureCredential
             try:
                 if self._credential is None:
@@ -131,7 +132,10 @@ class AzureAuth:
             except Exception as final_error:
                 raise AuthenticationError(
                     f"Failed to acquire access token: {str(final_error)}",
-                    suggestion="Run 'az login' to authenticate with Azure, or check your network connection"
+                    suggestion=(
+                        "Run 'az login' to authenticate with Azure, "
+                        "or check your network connection"
+                    ),
                 )
 
     def get_tenant_id(self) -> str:
@@ -181,24 +185,24 @@ class AzureAuth:
         try:
             # Get an access token - this uses cached credentials
             token = self.get_token("https://graph.microsoft.com/.default")
-            
+
             # Decode the JWT token payload (middle part between the dots)
             # JWT format: header.payload.signature
-            payload_part = token.split('.')[1]
-            
+            payload_part = token.split(".")[1]
+
             # Add padding if needed (JWT base64 may not be padded)
             padding = len(payload_part) % 4
             if padding:
-                payload_part += '=' * (4 - padding)
-            
+                payload_part += "=" * (4 - padding)
+
             # Decode and parse the JSON payload
             decoded = base64.urlsafe_b64decode(payload_part)
             claims = json.loads(decoded)
-            
+
             # The object ID is in the 'oid' claim
-            if 'oid' in claims:
-                return claims['oid']
-            
+            if "oid" in claims:
+                return claims["oid"]
+
             # Fallback: try the network call if token doesn't have OID
             result = subprocess.run(
                 ["az", "ad", "signed-in-user", "show", "--query", "id", "-o", "tsv"],
@@ -207,6 +211,6 @@ class AzureAuth:
                 check=True,
             )
             return result.stdout.strip()
-            
+
         except Exception as e:
             raise RuntimeError(f"Failed to get user object ID: {e}")
