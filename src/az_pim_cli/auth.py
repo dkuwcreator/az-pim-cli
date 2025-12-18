@@ -1,11 +1,9 @@
 """Authentication module for Azure PIM CLI."""
 
-import json
 import subprocess
 from typing import Optional
 
 from azure.identity import DefaultAzureCredential, AzureCliCredential
-from azure.core.credentials import AccessToken
 
 
 class AzureAuth:

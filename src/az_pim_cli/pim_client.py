@@ -1,7 +1,6 @@
 """Azure PIM API client."""
 
-import json
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -125,7 +124,7 @@ class PIMClient:
             "directoryScopeId": "/",
             "justification": justification,
             "scheduleInfo": {
-                "startDateTime": datetime.utcnow().isoformat() + "Z",
+                "startDateTime": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
                 "expiration": {"type": "afterDuration", "duration": duration},
             },
         }
@@ -176,7 +175,7 @@ class PIMClient:
                 "requestType": "SelfActivate",
                 "justification": justification,
                 "scheduleInfo": {
-                    "startDateTime": datetime.utcnow().isoformat() + "Z",
+                    "startDateTime": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
                     "expiration": {"type": "AfterDuration", "duration": duration},
                 },
             }

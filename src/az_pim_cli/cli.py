@@ -1,13 +1,11 @@
 """Main CLI module for Azure PIM CLI."""
 
-from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 import typer
 from rich.console import Console
 from rich.table import Table
-from rich import print as rprint
 
 from az_pim_cli.auth import AzureAuth
 from az_pim_cli.pim_client import PIMClient
@@ -20,6 +18,22 @@ app = typer.Typer(
 )
 
 console = Console()
+
+
+def parse_duration_from_alias(duration_str: Optional[str]) -> Optional[float]:
+    """
+    Parse duration from alias configuration.
+
+    Args:
+        duration_str: Duration string in PT format (e.g., PT8H)
+
+    Returns:
+        Duration in hours as float, or None
+    """
+    if not duration_str:
+        return None
+    # Remove PT prefix and H suffix, then convert to float
+    return float(duration_str.replace("PT", "").replace("H", ""))
 
 
 def get_duration_string(hours: Optional[float] = None) -> str:
@@ -111,7 +125,7 @@ def activate_role(
         if alias:
             console.print(f"[blue]Using alias '[bold]{role}[/bold]'[/blue]")
             role_id = alias.get("role")
-            duration = duration or (float(alias.get("duration", "PT8H").replace("PT", "").replace("H", "")) if alias.get("duration") else None)
+            duration = duration or parse_duration_from_alias(alias.get("duration"))
             justification = justification or alias.get("justification")
             if "scope" in alias:
                 scope = scope or alias.get("scope")
