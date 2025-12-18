@@ -3,6 +3,7 @@
 import base64
 import json
 import os
+import shutil
 import socket
 import subprocess
 from contextlib import contextmanager
@@ -84,6 +85,8 @@ class AzureAuth:
                 capture_output=True,
                 text=True,
                 check=True,
+                env=os.environ.copy(),
+                shell=True,
             )
             token_data = json.loads(result.stdout)
             return token_data["accessToken"]
@@ -103,16 +106,24 @@ class AzureAuth:
                 # Try fallback methods before giving up
                 pass
         except FileNotFoundError:
-            raise AuthenticationError(
-                "Azure CLI not found",
-                suggestion="Install Azure CLI from https://docs.microsoft.com/cli/azure/install-azure-cli",
-            )
+            # Check if az command exists at all
+            az_path = shutil.which("az")
+            if az_path is None:
+                raise AuthenticationError(
+                    "Azure CLI is not installed or not found in PATH",
+                    suggestion="Install Azure CLI from https://docs.microsoft.com/cli/azure/install-azure-cli",
+                )
+            else:
+                raise AuthenticationError(
+                    f"Failed to execute Azure CLI at {az_path}",
+                    suggestion="Check that Azure CLI is executable and your environment PATH is correctly configured",
+                )
         except json.JSONDecodeError:
             raise AuthenticationError(
                 "Failed to parse Azure CLI token response",
                 suggestion="Try running 'az login' to refresh your authentication",
             )
-        except Exception:
+        except Exception as e:
             # Try fallback methods
             pass
 
@@ -151,6 +162,8 @@ class AzureAuth:
                 capture_output=True,
                 text=True,
                 check=True,
+                env=os.environ.copy(),
+                shell=True,
             )
             return result.stdout.strip()
         except Exception as e:
@@ -169,6 +182,8 @@ class AzureAuth:
                 capture_output=True,
                 text=True,
                 check=True,
+                env=os.environ.copy(),
+                shell=True,
             )
             return result.stdout.strip()
         except Exception as e:
@@ -209,6 +224,8 @@ class AzureAuth:
                 capture_output=True,
                 text=True,
                 check=True,
+                env=os.environ.copy(),
+                shell=True,
             )
             return result.stdout.strip()
 
