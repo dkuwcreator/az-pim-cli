@@ -266,6 +266,31 @@ az-pim list
 az-pim list --full-scope
 ```
 
+#### Interactive Selection
+
+Use interactive mode to select and activate roles:
+
+```bash
+# List roles and select interactively
+az-pim list --select
+
+# For resource roles
+az-pim list --resource --select
+```
+
+#### Quick Activation by Number
+
+All listed roles are numbered for easy reference:
+
+```bash
+# List roles to see numbers
+az-pim list
+
+# Activate by number instead of copying the full role ID
+az-pim activate 1 --duration 4 --justification "Quick access"
+az-pim activate "#2" --duration 2 --justification "Emergency access"
+```
+
 ## Troubleshooting
 
 ### DNS Resolution Failures
