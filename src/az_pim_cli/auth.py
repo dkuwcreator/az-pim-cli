@@ -89,12 +89,13 @@ class AzureAuth:
         if self._default_credential is None:
             try:
                 self._default_credential = DefaultAzureCredential()
-            except Exception as e:
+            except Exception:
                 raise AuthenticationError(
                     "No Azure credentials available",
                     suggestion=(
                         "Run 'az login' to authenticate with Azure CLI, "
-                        "or configure Azure SDK credentials (service principal, managed identity, etc.)"
+                        "or configure Azure SDK credentials "
+                        "(service principal, managed identity, etc.)"
                     ),
                 )
 

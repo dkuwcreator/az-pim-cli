@@ -1,6 +1,5 @@
 """Tests for response normalization."""
 
-import pytest
 from az_pim_cli.models import (
     normalize_arm_role,
     normalize_graph_role,
