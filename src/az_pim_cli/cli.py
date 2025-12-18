@@ -85,15 +85,14 @@ def list_roles(
         table.add_column("Status", style="green")
 
         for role in roles:
-            if resource:
-                role_name = role.get("properties", {}).get("expandedProperties", {}).get("roleDefinition", {}).get("displayName", "Unknown")
-                role_id = role.get("properties", {}).get("roleDefinitionId", "")
-                status = role.get("properties", {}).get("status", "Active")
-            else:
-                role_def = role.get("roleDefinition", {})
-                role_name = role_def.get("displayName", "Unknown")
-                role_id = role_def.get("id", "")
-                status = role.get("status", "Active")
+            # ARM API response format (used for both directory and resource roles now)
+            props = role.get("properties", {})
+            expanded = props.get("expandedProperties", {})
+            role_def = expanded.get("roleDefinition", {})
+            
+            role_name = role_def.get("displayName", "Unknown")
+            role_id = props.get("roleDefinitionId", "")
+            status = props.get("status", "Active")
 
             table.add_row(role_name, role_id, status)
 

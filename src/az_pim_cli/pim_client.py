@@ -43,20 +43,23 @@ class PIMClient:
     def list_role_assignments(self, principal_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         List Azure AD role assignments for the user.
+        Uses ARM API with asTarget() filter instead of Graph API to avoid permission issues.
 
         Args:
-            principal_id: Principal ID (user object ID)
+            principal_id: Principal ID (user object ID) - not used with asTarget() filter
 
         Returns:
             List of role assignments
         """
-        if principal_id is None:
-            principal_id = self.auth.get_user_object_id()
+        # Use ARM API with asTarget() filter - this matches what Azure Portal uses
+        # and works with standard Azure CLI permissions without requiring Graph API permissions
+        url = f"{self.ARM_API_BASE}/providers/Microsoft.Authorization/roleEligibilityScheduleInstances"
+        params = {
+            "api-version": "2020-10-01",
+            "$filter": "asTarget()"  # Gets roles for the current authenticated user
+        }
 
-        url = f"{self.GRAPH_API_BETA}/roleManagement/directory/roleEligibilitySchedules"
-        params = {"$filter": f"principalId eq '{principal_id}'", "$expand": "roleDefinition"}
-
-        headers = self._get_headers()
+        headers = self._get_headers("https://management.azure.com/.default")
         response = requests.get(url, headers=headers, params=params)
         response.raise_for_status()
 
