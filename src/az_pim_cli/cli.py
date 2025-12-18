@@ -1,5 +1,6 @@
 """Main CLI module for Azure PIM CLI."""
 
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -10,6 +11,8 @@ from rich.table import Table
 from az_pim_cli.auth import AzureAuth
 from az_pim_cli.pim_client import PIMClient
 from az_pim_cli.config import Config
+from az_pim_cli.models import normalize_roles, RoleSource
+from az_pim_cli.exceptions import PIMError, NetworkError, PermissionError as PIMPermissionError, AuthenticationError
 
 app = typer.Typer(
     name="az-pim",
@@ -55,11 +58,14 @@ def get_duration_string(hours: Optional[float] = None) -> str:
 def list_roles(
     resource: bool = typer.Option(False, "--resource", "-r", help="List resource roles instead of directory roles"),
     scope: Optional[str] = typer.Option(None, "--scope", "-s", help="Scope for resource roles (e.g., subscriptions/{id})"),
+    full_scope: bool = typer.Option(False, "--full-scope", help="Show full scope paths instead of shortened versions"),
+    limit: Optional[int] = typer.Option(None, "--limit", "-l", help="Limit number of results"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
 ) -> None:
     """List eligible roles."""
     try:
         auth = AzureAuth()
-        client = PIMClient(auth)
+        client = PIMClient(auth, verbose=verbose)
 
         console.print("[bold blue]Fetching eligible roles...[/bold blue]")
 
@@ -69,37 +75,67 @@ def list_roles(
                 subscription_id = auth.get_subscription_id()
                 scope = f"subscriptions/{subscription_id}"
 
-            roles = client.list_resource_role_assignments(scope)
-            console.print(f"\n[bold green]Eligible Resource Roles (Scope: {scope})[/bold green]\n")
+            roles_data = client.list_resource_role_assignments(scope, limit=limit)
+            console.print(f"\n[bold green]Eligible Resource Roles (Scope: {scope})[/bold green]")
         else:
-            roles = client.list_role_assignments()
-            console.print("\n[bold green]Eligible Azure AD Roles[/bold green]\n")
+            roles_data = client.list_role_assignments(limit=limit)
+            console.print("\n[bold green]Eligible Azure AD Roles[/bold green]")
+        
+        # Show backend info in verbose mode
+        if verbose:
+            backend = os.environ.get("AZ_PIM_BACKEND", "ARM")
+            ipv4_mode = os.environ.get("AZ_PIM_IPV4_ONLY", "off")
+            console.print(f"[dim]Backend: {backend} | IPv4-only: {ipv4_mode}[/dim]")
+
+        # Normalize responses
+        roles = normalize_roles(roles_data, source=RoleSource.ARM)
 
         if not roles:
             console.print("[yellow]No eligible roles found.[/yellow]")
             return
+        
+        console.print(f"[dim]Found {len(roles)} role(s)[/dim]\n")
 
         table = Table(show_header=True, header_style="bold magenta")
         table.add_column("Role Name", style="cyan")
         table.add_column("Role ID", style="dim")
         table.add_column("Status", style="green")
+        table.add_column("Scope", style="yellow")
 
         for role in roles:
-            # ARM API response format (used for both directory and resource roles now)
-            props = role.get("properties", {})
-            expanded = props.get("expandedProperties", {})
-            role_def = expanded.get("roleDefinition", {})
-            
-            role_name = role_def.get("displayName", "Unknown")
-            role_id = props.get("roleDefinitionId", "")
-            status = props.get("status", "Active")
-
-            table.add_row(role_name, role_id, status)
+            scope_display = role.scope if full_scope else role.get_short_scope()
+            table.add_row(role.name, role.id, role.status, scope_display)
 
         console.print(table)
 
-    except Exception as e:
+    except AuthenticationError as e:
+        console.print(f"[bold red]Authentication Error:[/bold red] {str(e)}")
+        if e.suggestion:
+            console.print(f"[yellow]Suggestion:[/yellow] {e.suggestion}")
+        raise typer.Exit(1)
+    except NetworkError as e:
+        console.print(f"[bold red]Network Error:[/bold red] {str(e)}")
+        if e.endpoint:
+            console.print(f"[dim]Endpoint: {e.endpoint}[/dim]")
+        if e.suggest_ipv4:
+            console.print("[yellow]💡 Tip:[/yellow] If you're experiencing DNS issues, try enabling IPv4-only mode:")
+            console.print("   export AZ_PIM_IPV4_ONLY=1")
+        raise typer.Exit(1)
+    except PIMPermissionError as e:
+        console.print(f"[bold red]Permission Error:[/bold red] {str(e)}")
+        if e.endpoint:
+            console.print(f"[dim]Endpoint: {e.endpoint}[/dim]")
+        if e.required_permissions:
+            console.print(f"[yellow]Required permissions:[/yellow] {e.required_permissions}")
+        raise typer.Exit(1)
+    except PIMError as e:
         console.print(f"[bold red]Error:[/bold red] {str(e)}")
+        raise typer.Exit(1)
+    except Exception as e:
+        console.print(f"[bold red]Unexpected Error:[/bold red] {str(e)}")
+        if verbose:
+            import traceback
+            console.print("[dim]" + traceback.format_exc() + "[/dim]")
         raise typer.Exit(1)
 
 
@@ -112,11 +148,12 @@ def activate_role(
     scope: Optional[str] = typer.Option(None, "--scope", "-s", help="Scope for resource roles"),
     ticket: Optional[str] = typer.Option(None, "--ticket", "-t", help="Ticket number"),
     ticket_system: Optional[str] = typer.Option(None, "--ticket-system", help="Ticket system name"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
 ) -> None:
     """Activate a role."""
     try:
         auth = AzureAuth()
-        client = PIMClient(auth)
+        client = PIMClient(auth, verbose=verbose)
         config = Config()
 
         # Check if role is an alias
@@ -169,8 +206,34 @@ def activate_role(
         console.print("[bold green]✓ Role activation requested successfully![/bold green]")
         console.print(f"[dim]Request ID: {result.get('id', 'N/A')}[/dim]")
 
-    except Exception as e:
+    except AuthenticationError as e:
+        console.print(f"[bold red]Authentication Error:[/bold red] {str(e)}")
+        if e.suggestion:
+            console.print(f"[yellow]Suggestion:[/yellow] {e.suggestion}")
+        raise typer.Exit(1)
+    except NetworkError as e:
+        console.print(f"[bold red]Network Error:[/bold red] {str(e)}")
+        if e.endpoint:
+            console.print(f"[dim]Endpoint: {e.endpoint}[/dim]")
+        if e.suggest_ipv4:
+            console.print("[yellow]💡 Tip:[/yellow] Try enabling IPv4-only mode:")
+            console.print("   export AZ_PIM_IPV4_ONLY=1")
+        raise typer.Exit(1)
+    except PIMPermissionError as e:
+        console.print(f"[bold red]Permission Error:[/bold red] {str(e)}")
+        if e.endpoint:
+            console.print(f"[dim]Endpoint: {e.endpoint}[/dim]")
+        if e.required_permissions:
+            console.print(f"[yellow]Required permissions:[/yellow] {e.required_permissions}")
+        raise typer.Exit(1)
+    except PIMError as e:
         console.print(f"[bold red]Error:[/bold red] {str(e)}")
+        raise typer.Exit(1)
+    except Exception as e:
+        console.print(f"[bold red]Unexpected Error:[/bold red] {str(e)}")
+        if verbose:
+            import traceback
+            console.print("[dim]" + traceback.format_exc() + "[/dim]")
         raise typer.Exit(1)
 
 

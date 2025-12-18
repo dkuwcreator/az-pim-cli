@@ -2,21 +2,51 @@
 
 import base64
 import json
+import os
 import socket
 import subprocess
+from contextlib import contextmanager
 from typing import Optional
 
 from azure.identity import DefaultAzureCredential, AzureCliCredential
 
-# Monkey-patch socket.getaddrinfo to force IPv4 resolution only
-# This works around DNS resolution issues with IPv6 on some networks
+
+# Store original getaddrinfo for selective IPv4 forcing
 _original_getaddrinfo = socket.getaddrinfo
 
-def _ipv4_only_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
-    """Force IPv4 resolution to avoid IPv6 DNS issues"""
-    return _original_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
 
-socket.getaddrinfo = _ipv4_only_getaddrinfo
+@contextmanager
+def ipv4_only_context():
+    """
+    Context manager that temporarily forces IPv4-only DNS resolution.
+    This works around DNS resolution issues with IPv6 on some networks.
+    
+    Usage:
+        with ipv4_only_context():
+            # Network calls here will use IPv4 only
+            response = requests.get(url)
+    """
+    def _ipv4_only_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+        """Force IPv4 resolution to avoid IPv6 DNS issues"""
+        return _original_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
+    
+    original = socket.getaddrinfo
+    socket.getaddrinfo = _ipv4_only_getaddrinfo
+    try:
+        yield
+    finally:
+        socket.getaddrinfo = original
+
+
+def should_use_ipv4_only() -> bool:
+    """
+    Check if IPv4-only mode should be enabled.
+    Can be controlled via AZ_PIM_IPV4_ONLY environment variable.
+    
+    Returns:
+        True if IPv4-only mode is enabled
+    """
+    return os.environ.get("AZ_PIM_IPV4_ONLY", "").lower() in ("1", "true", "yes")
 
 
 class AzureAuth:
@@ -37,7 +67,12 @@ class AzureAuth:
 
         Returns:
             Access token string
+            
+        Raises:
+            AuthenticationError: If token cannot be acquired with actionable suggestions
         """
+        from az_pim_cli.exceptions import AuthenticationError
+        
         try:
             # Convert scope to resource URL (remove /.default suffix)
             resource = scope.replace("/.default", "")
@@ -51,19 +86,53 @@ class AzureAuth:
             )
             token_data = json.loads(result.stdout)
             return token_data["accessToken"]
+        except subprocess.CalledProcessError as e:
+            stderr = e.stderr if e.stderr else ""
+            if "az login" in stderr or "not logged in" in stderr.lower():
+                raise AuthenticationError(
+                    "Not logged in to Azure CLI",
+                    suggestion="Run 'az login' to authenticate with Azure"
+                )
+            elif "expired" in stderr.lower() or "refresh" in stderr.lower():
+                raise AuthenticationError(
+                    "Azure CLI token has expired",
+                    suggestion="Run 'az login' to refresh your authentication"
+                )
+            else:
+                # Try fallback methods before giving up
+                pass
+        except FileNotFoundError:
+            raise AuthenticationError(
+                "Azure CLI not found",
+                suggestion="Install Azure CLI from https://docs.microsoft.com/cli/azure/install-azure-cli"
+            )
+        except json.JSONDecodeError:
+            raise AuthenticationError(
+                "Failed to parse Azure CLI token response",
+                suggestion="Try running 'az login' to refresh your authentication"
+            )
+        except Exception:
+            # Try fallback methods
+            pass
+        
+        # Fallback to azure.identity library methods
+        try:
+            if self._cli_credential is None:
+                self._cli_credential = AzureCliCredential()
+            token = self._cli_credential.get_token(scope)
+            return token.token
         except Exception as e:
-            # Fallback to azure.identity library methods
+            # Last resort: DefaultAzureCredential
             try:
-                if self._cli_credential is None:
-                    self._cli_credential = AzureCliCredential()
-                token = self._cli_credential.get_token(scope)
-                return token.token
-            except Exception:
-                # Last resort: DefaultAzureCredential
                 if self._credential is None:
                     self._credential = DefaultAzureCredential()
                 token = self._credential.get_token(scope)
                 return token.token
+            except Exception as final_error:
+                raise AuthenticationError(
+                    f"Failed to acquire access token: {str(final_error)}",
+                    suggestion="Run 'az login' to authenticate with Azure, or check your network connection"
+                )
 
     def get_tenant_id(self) -> str:
         """
