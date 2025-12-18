@@ -3,9 +3,7 @@
 import base64
 import json
 import os
-import shutil
 import socket
-import subprocess
 from contextlib import contextmanager
 from typing import Optional
 
@@ -52,17 +50,70 @@ def should_use_ipv4_only() -> bool:
 
 
 class AzureAuth:
-    """Handle Azure authentication using Azure CLI or MSAL."""
+    """Handle Azure authentication using Azure SDK."""
 
     def __init__(self) -> None:
         """Initialize Azure authentication."""
-        self._credential: Optional[DefaultAzureCredential] = None
-        self._cli_credential: Optional[AzureCliCredential] = None
+        self._credential: Optional[AzureCliCredential] = None
+        self._default_credential: Optional[DefaultAzureCredential] = None
+        self._token_cache: dict[str, dict] = {}
+
+    def _get_credential(self) -> AzureCliCredential | DefaultAzureCredential:
+        """
+        Get the appropriate credential for authentication.
+        Tries AzureCliCredential first (uses cached Azure CLI login),
+        then falls back to DefaultAzureCredential.
+
+        Returns:
+            Azure credential instance
+
+        Raises:
+            AuthenticationError: If no credentials are available
+        """
+        from az_pim_cli.exceptions import AuthenticationError
+
+        if self._credential is None:
+            try:
+                self._credential = AzureCliCredential()
+            except Exception:
+                pass
+
+        if self._credential is not None:
+            try:
+                # Test the credential
+                self._credential.get_token("https://management.azure.com/.default")
+                return self._credential
+            except Exception:
+                self._credential = None
+
+        if self._default_credential is None:
+            try:
+                self._default_credential = DefaultAzureCredential()
+            except Exception as e:
+                raise AuthenticationError(
+                    "No Azure credentials available",
+                    suggestion=(
+                        "Run 'az login' to authenticate with Azure CLI, "
+                        "or configure Azure SDK credentials (service principal, managed identity, etc.)"
+                    ),
+                )
+
+        try:
+            # Test the credential
+            self._default_credential.get_token("https://management.azure.com/.default")
+            return self._default_credential
+        except Exception as e:
+            raise AuthenticationError(
+                f"Failed to acquire access token: {str(e)}",
+                suggestion=(
+                    "Run 'az login' to authenticate with Azure CLI, "
+                    "or check your network connection"
+                ),
+            )
 
     def get_token(self, scope: str = "https://management.azure.com/.default") -> str:
         """
-        Get an access token for the specified scope using Azure CLI directly.
-        This works offline by using cached credentials from Azure CLI.
+        Get an access token for the specified scope.
 
         Args:
             scope: The scope for the access token
@@ -71,138 +122,36 @@ class AzureAuth:
             Access token string
 
         Raises:
-            AuthenticationError: If token cannot be acquired with actionable suggestions
+            AuthenticationError: If token cannot be acquired
         """
-        from az_pim_cli.exceptions import AuthenticationError
-
         try:
-            # Convert scope to resource URL (remove /.default suffix)
-            resource = scope.replace("/.default", "")
-
-            # Get token directly from Azure CLI - uses local cache, works offline
-            result = subprocess.run(
-                ["az", "account", "get-access-token", "--resource", resource, "-o", "json"],
-                capture_output=True,
-                text=True,
-                check=True,
-                env=os.environ.copy(),
-                shell=True,
-            )
-            token_data = json.loads(result.stdout)
-            return token_data["accessToken"]
-        except subprocess.CalledProcessError as e:
-            stderr = e.stderr if e.stderr else ""
-            if "az login" in stderr or "not logged in" in stderr.lower():
-                raise AuthenticationError(
-                    "Not logged in to Azure CLI",
-                    suggestion="Run 'az login' to authenticate with Azure",
-                )
-            elif "expired" in stderr.lower() or "refresh" in stderr.lower():
-                raise AuthenticationError(
-                    "Azure CLI token has expired",
-                    suggestion="Run 'az login' to refresh your authentication",
-                )
-            else:
-                # Try fallback methods before giving up
-                pass
-        except FileNotFoundError:
-            # Check if az command exists at all
-            az_path = shutil.which("az")
-            if az_path is None:
-                raise AuthenticationError(
-                    "Azure CLI is not installed or not found in PATH",
-                    suggestion="Install Azure CLI from https://docs.microsoft.com/cli/azure/install-azure-cli",
-                )
-            else:
-                raise AuthenticationError(
-                    f"Failed to execute Azure CLI at {az_path}",
-                    suggestion="Check that Azure CLI is executable and your environment PATH is correctly configured",
-                )
-        except json.JSONDecodeError:
-            raise AuthenticationError(
-                "Failed to parse Azure CLI token response",
-                suggestion="Try running 'az login' to refresh your authentication",
-            )
-        except Exception as e:
-            # Try fallback methods
-            pass
-
-        # Fallback to azure.identity library methods
-        try:
-            if self._cli_credential is None:
-                self._cli_credential = AzureCliCredential()
-            token = self._cli_credential.get_token(scope)
+            credential = self._get_credential()
+            token = credential.get_token(scope)
             return token.token
-        except Exception:
-            # Last resort: DefaultAzureCredential
-            try:
-                if self._credential is None:
-                    self._credential = DefaultAzureCredential()
-                token = self._credential.get_token(scope)
-                return token.token
-            except Exception as final_error:
-                raise AuthenticationError(
-                    f"Failed to acquire access token: {str(final_error)}",
-                    suggestion=(
-                        "Run 'az login' to authenticate with Azure, "
-                        "or check your network connection"
-                    ),
-                )
-
-    def get_tenant_id(self) -> str:
-        """
-        Get the current tenant ID from Azure CLI.
-
-        Returns:
-            Tenant ID string
-        """
-        try:
-            result = subprocess.run(
-                ["az", "account", "show", "--query", "tenantId", "-o", "tsv"],
-                capture_output=True,
-                text=True,
-                check=True,
-                env=os.environ.copy(),
-                shell=True,
-            )
-            return result.stdout.strip()
         except Exception as e:
-            raise RuntimeError(f"Failed to get tenant ID: {e}")
+            from az_pim_cli.exceptions import AuthenticationError
 
-    def get_subscription_id(self) -> str:
-        """
-        Get the current subscription ID from Azure CLI.
-
-        Returns:
-            Subscription ID string
-        """
-        try:
-            result = subprocess.run(
-                ["az", "account", "show", "--query", "id", "-o", "tsv"],
-                capture_output=True,
-                text=True,
-                check=True,
-                env=os.environ.copy(),
-                shell=True,
+            raise AuthenticationError(
+                f"Failed to acquire access token: {str(e)}",
+                suggestion=(
+                    "Run 'az login' to authenticate with Azure CLI, "
+                    "or check your network connection"
+                ),
             )
-            return result.stdout.strip()
-        except Exception as e:
-            raise RuntimeError(f"Failed to get subscription ID: {e}")
 
-    def get_user_object_id(self) -> str:
+    def _extract_token_claim(self, scope: str, claim: str) -> Optional[str]:
         """
-        Get the current user's object ID from the access token claims.
-        This avoids making network calls and works offline.
+        Extract a claim from the JWT token payload.
+
+        Args:
+            scope: The scope for the access token
+            claim: The claim name to extract (e.g., 'oid', 'tid')
 
         Returns:
-            User object ID string
+            The claim value or None if not found
         """
         try:
-            # Get an access token - this uses cached credentials
-            token = self.get_token("https://graph.microsoft.com/.default")
-
-            # Decode the JWT token payload (middle part between the dots)
-            # JWT format: header.payload.signature
+            token = self.get_token(scope)
             payload_part = token.split(".")[1]
 
             # Add padding if needed (JWT base64 may not be padded)
@@ -210,24 +159,86 @@ class AzureAuth:
             if padding:
                 payload_part += "=" * (4 - padding)
 
-            # Decode and parse the JSON payload
             decoded = base64.urlsafe_b64decode(payload_part)
             claims = json.loads(decoded)
 
-            # The object ID is in the 'oid' claim
-            if "oid" in claims:
-                return claims["oid"]
+            return claims.get(claim)
+        except Exception:
+            return None
 
-            # Fallback: try the network call if token doesn't have OID
-            result = subprocess.run(
-                ["az", "ad", "signed-in-user", "show", "--query", "id", "-o", "tsv"],
-                capture_output=True,
-                text=True,
-                check=True,
-                env=os.environ.copy(),
-                shell=True,
-            )
-            return result.stdout.strip()
+    def get_tenant_id(self) -> str:
+        """
+        Get the current tenant ID from the access token.
 
+        Returns:
+            Tenant ID string
+
+        Raises:
+            RuntimeError: If tenant ID cannot be determined
+        """
+        tenant_id = self._extract_token_claim("https://management.azure.com/.default", "tid")
+
+        if tenant_id:
+            return tenant_id
+
+        raise RuntimeError(
+            "Failed to get tenant ID from token claims. "
+            "Ensure you have successfully logged in with 'az login'."
+        )
+
+    def get_subscription_id(self) -> str:
+        """
+        Get the current subscription ID.
+
+        Returns:
+            Subscription ID string
+
+        Raises:
+            RuntimeError: If subscription ID cannot be determined
+        """
+        # Try to get from token claims (some tokens include this)
+        subscription_id = self._extract_token_claim(
+            "https://management.azure.com/.default", "subscriptionId"
+        )
+
+        if subscription_id:
+            return subscription_id
+
+        # If not in token, we need to query the Azure SDK
+        # Use the subscription context from the credential
+        try:
+            from azure.mgmt.subscription import SubscriptionClient
+
+            credential = self._get_credential()
+            client = SubscriptionClient(credential)
+
+            for subscription in client.subscriptions.list():
+                if subscription.subscription_id:
+                    return subscription.subscription_id
+
+            raise RuntimeError("No subscriptions found for the authenticated user")
         except Exception as e:
-            raise RuntimeError(f"Failed to get user object ID: {e}")
+            raise RuntimeError(
+                f"Failed to determine subscription ID: {str(e)}. "
+                "Ensure you have selected a subscription with 'az account set --subscription <sub>'."
+            )
+
+    def get_user_object_id(self) -> str:
+        """
+        Get the current user's object ID from the access token claims.
+
+        Returns:
+            User object ID string
+
+        Raises:
+            RuntimeError: If object ID cannot be determined
+        """
+        object_id = self._extract_token_claim("https://graph.microsoft.com/.default", "oid")
+
+        if object_id:
+            return object_id
+
+        raise RuntimeError(
+            "Failed to get user object ID from token claims. "
+            "Ensure you have successfully logged in with 'az login'."
+        )
