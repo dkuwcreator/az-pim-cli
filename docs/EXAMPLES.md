@@ -15,6 +15,12 @@ az-pim list --resource
 
 # List roles for specific subscription
 az-pim list --resource --scope "subscriptions/12345678-1234-1234-1234-123456789abc"
+
+# Interactive selection mode - list roles and activate
+az-pim list --select
+
+# Interactive selection for resource roles
+az-pim list --resource --select
 ```
 
 ### Activate Roles
@@ -37,6 +43,12 @@ az-pim activate "Privileged Role Administrator" \
   --justification "PIM configuration update" \
   --ticket "INC123456" \
   --ticket-system "ServiceNow"
+
+# Activate by role number (from list output)
+az-pim activate 1 --duration 4 --justification "Quick access"
+
+# Using # prefix with role number
+az-pim activate "#3" --duration 2 --justification "Emergency access"
 ```
 
 ### Activate Resource Roles
@@ -51,6 +63,9 @@ az-pim activate "8e3af657-a8ff-443c-a75c-2fe8c4bcb635" \
 
 # Activate Contributor role for current subscription
 az-pim activate "Contributor" --resource --duration 4
+
+# Activate resource role by number
+az-pim activate 2 --resource --duration 4 --justification "Quick access"
 ```
 
 ## Alias Management
@@ -192,6 +207,35 @@ az-pim activate "User Administrator" \
   --justification "Password reset for executive team"
 ```
 
+### Scenario 6: Interactive Role Selection
+
+```bash
+# List roles and select interactively
+az-pim list --select
+
+# After seeing the list, you'll be prompted to:
+# 1. Enter the role number to activate
+# 2. Specify duration (default: 8 hours)
+# 3. Provide justification
+
+# This is useful when you're not sure of the exact role name
+# or want a quick selection workflow
+```
+
+### Scenario 7: Quick Activation by Number
+
+```bash
+# First, list available roles to see the numbers
+az-pim list
+
+# Then activate by number (much faster than typing full role ID)
+az-pim activate 1 --duration 4 --justification "Quick access needed"
+
+# Works with resource roles too
+az-pim list --resource
+az-pim activate "#2" --resource --duration 2 --justification "Emergency access"
+```
+
 ## Automation Examples
 
 ### Shell Script for Daily Access
@@ -263,3 +307,6 @@ else:
 4. **Review History Regularly**: Check activation patterns with `az-pim history`
 5. **Automate Common Activations**: Use scripts for daily/regular access patterns
 6. **Document Team Aliases**: Share alias configurations with team members
+7. **Use Interactive Mode**: When unsure of role names, use `az-pim list --select` for guided selection
+8. **Activate by Number**: Use role numbers (e.g., `az-pim activate 1`) for faster activation after listing roles
+9. **Combine List and Activate**: Run `az-pim list` first to see all roles with numbers, then activate by number
