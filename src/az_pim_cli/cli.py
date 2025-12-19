@@ -6,6 +6,7 @@ from typing import Optional
 import typer
 from rich.console import Console
 from rich.table import Table
+from rich.markup import escape
 
 from az_pim_cli.auth import AzureAuth
 from az_pim_cli.pim_client import PIMClient
@@ -144,8 +145,11 @@ def list_roles(
             condition_display = role.condition if role.condition else "-"
             end_time_display = role.end_time if role.end_time else "-"
             
-            # Action column - show alias name for aliases
-            action_display = f"[{role.alias_name}]" if role.is_alias else "Activate"
+            # Action column - show alias name for aliases (escape brackets to prevent Rich markup interpretation)
+            if role.is_alias and role.alias_name:
+                action_display = escape(f"[{role.alias_name}]")
+            else:
+                action_display = "Activate"
             
             table.add_row(
                 str(idx),
