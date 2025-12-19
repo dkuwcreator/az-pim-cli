@@ -114,59 +114,90 @@ def list_roles(
             alias_role = alias_to_normalized_role(alias_name, alias_config)
             alias_roles.append(alias_role)
 
-        # Combine aliases first, then Azure roles
-        roles = alias_roles + azure_roles
+        # Combine aliases first, then Azure roles (for numbering consistency)
+        all_roles = alias_roles + azure_roles
 
-        if not roles:
-            console.print("[yellow]No eligible roles found.[/yellow]")
+        if not all_roles:
+            console.print("[yellow]No eligible roles or aliases found.[/yellow]")
             return
 
         console.print(
             f"[dim]Found {len(alias_roles)} alias(es) and {len(azure_roles)} Azure role(s)[/dim]\n"
         )
 
-        # Create table with portal-style columns
-        table = Table(show_header=True, header_style="bold magenta")
-        table.add_column("#", style="bold white", justify="right", width=4)
-        table.add_column("Role", style="cyan")
-        table.add_column("Resource", style="yellow")
-        table.add_column("Resource type", style="dim")
-        table.add_column("Membership", style="dim")
-        table.add_column("Condition", style="dim")
-        table.add_column("End time", style="green")
-        table.add_column("Action", style="bold")
+        # Display aliases in a separate table first
+        if alias_roles:
+            console.print("[bold green]Configured Aliases[/bold green]")
+            alias_table = Table(show_header=True, header_style="bold magenta")
+            alias_table.add_column("#", style="bold white", justify="right", width=4)
+            alias_table.add_column("Alias", style="cyan")
+            alias_table.add_column("Role", style="yellow")
+            alias_table.add_column("Duration", style="green")
+            alias_table.add_column("Description", style="dim")
+            alias_table.add_column("Scope", style="dim")
 
-        for idx, role in enumerate(roles, start=1):
-            # Format role name with marker for aliases
-            role_name = f"⭐ {role.name}" if role.is_alias else role.name
+            for idx, alias_role in enumerate(alias_roles, start=1):
+                # Extract alias details
+                alias_name = alias_role.alias_name or "Unknown"
+                role_name = alias_role.name
+                duration_display = alias_role.end_time if alias_role.end_time else "-"
+                
+                # Get description from raw alias config
+                alias_config = config.get_alias(alias_name)
+                description = alias_config.get("justification", "-") if alias_config else "-"
+                
+                # Format scope display
+                scope_display = alias_role.resource_name or (
+                    alias_role.scope if full_scope else alias_role.get_short_scope()
+                )
 
-            # Get resource info
-            resource_display = role.resource_name or (
-                role.scope if full_scope else role.get_short_scope()
-            )
-            resource_type_display = role.resource_type or "-"
-            membership_display = role.membership_type or "Eligible"
-            condition_display = role.condition if role.condition else "-"
-            end_time_display = role.end_time if role.end_time else "-"
+                alias_table.add_row(
+                    str(idx),
+                    alias_name,
+                    role_name,
+                    duration_display,
+                    description,
+                    scope_display,
+                )
 
-            # Action column - show alias name for aliases (escape brackets to prevent Rich markup interpretation)
-            if role.is_alias and role.alias_name:
-                action_display = escape(f"[{role.alias_name}]")
-            else:
-                action_display = "Activate"
+            console.print(alias_table)
+            console.print()
 
-            table.add_row(
-                str(idx),
-                role_name,
-                resource_display,
-                resource_type_display,
-                membership_display,
-                condition_display,
-                end_time_display,
-                action_display,
-            )
+        # Display Azure roles in a separate table
+        if azure_roles:
+            role_type = "Resource Roles" if resource else "Azure AD Roles"
+            console.print(f"[bold green]Eligible {role_type}[/bold green]")
+            
+            roles_table = Table(show_header=True, header_style="bold magenta")
+            roles_table.add_column("#", style="bold white", justify="right", width=4)
+            roles_table.add_column("Role", style="cyan")
+            roles_table.add_column("Resource", style="yellow")
+            roles_table.add_column("Resource type", style="dim")
+            roles_table.add_column("Membership", style="dim")
+            roles_table.add_column("Condition", style="dim")
+            roles_table.add_column("End time", style="green")
 
-        console.print(table)
+            for idx, role in enumerate(azure_roles, start=len(alias_roles) + 1):
+                # Get resource info
+                resource_display = role.resource_name or (
+                    role.scope if full_scope else role.get_short_scope()
+                )
+                resource_type_display = role.resource_type or "-"
+                membership_display = role.membership_type or "Eligible"
+                condition_display = role.condition if role.condition else "-"
+                end_time_display = role.end_time if role.end_time else "-"
+
+                roles_table.add_row(
+                    str(idx),
+                    role.name,
+                    resource_display,
+                    resource_type_display,
+                    membership_display,
+                    condition_display,
+                    end_time_display,
+                )
+
+            console.print(roles_table)
 
         # Interactive selection mode
         if select:
@@ -180,11 +211,11 @@ def list_roles(
                     return
 
                 role_idx = int(selection) - 1
-                if role_idx < 0 or role_idx >= len(roles):
+                if role_idx < 0 or role_idx >= len(all_roles):
                     console.print("[red]Invalid selection.[/red]")
                     raise typer.Exit(1)
 
-                selected_role = roles[role_idx]
+                selected_role = all_roles[role_idx]
                 console.print(
                     f"\n[bold blue]Selected:[/bold blue] {selected_role.name} ({selected_role.id})"
                 )
@@ -620,7 +651,7 @@ def remove_alias(name: str = typer.Argument(..., help="Alias name to remove")) -
 
 @alias_app.command("list")
 def list_aliases() -> None:
-    """List all aliases."""
+    """List all aliases with their details."""
     try:
         config = Config()
         aliases = config.list_aliases()
@@ -634,15 +665,22 @@ def list_aliases() -> None:
         table = Table(show_header=True, header_style="bold magenta")
         table.add_column("Alias", style="cyan")
         table.add_column("Role", style="green")
-        table.add_column("Duration", style="dim")
+        table.add_column("Duration", style="yellow")
+        table.add_column("Description", style="dim")
         table.add_column("Scope", style="dim")
 
         for alias_name, alias_config in aliases.items():
             role = alias_config.get("role", "N/A")
             duration = alias_config.get("duration", "Default")
+            description = alias_config.get("justification", "-")
             scope = alias_config.get("scope", "directory")
+            
+            # Add subscription info to scope if present
+            if scope == "subscription" and alias_config.get("subscription"):
+                sub_id = alias_config["subscription"][:8]  # First 8 chars
+                scope = f"{scope} (sub:{sub_id}...)"
 
-            table.add_row(alias_name, role, duration, scope)
+            table.add_row(alias_name, role, duration, description, scope)
 
         console.print(table)
 
