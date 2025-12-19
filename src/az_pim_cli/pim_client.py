@@ -104,7 +104,13 @@ class PIMClient:
                 # Handle specific HTTP errors
                 if response.status_code == 403:
                     try:
-                        principal_id = self.auth.get_user_object_id()
+                        # Use Graph scope for Graph API endpoints, ARM scope for ARM endpoints
+                        # Parse URL properly to avoid substring matching vulnerabilities
+                        from urllib.parse import urlparse
+                        parsed_url = urlparse(url)
+                        is_graph_api = parsed_url.hostname == "graph.microsoft.com"
+                        scope_for_oid = "https://graph.microsoft.com/.default" if is_graph_api else "https://management.azure.com/.default"
+                        principal_id = self.auth.get_user_object_id(scope=scope_for_oid)
                     except Exception:
                         principal_id = "unknown"
                     raise PermissionError(
@@ -230,7 +236,7 @@ class PIMClient:
             List of role assignments
         """
         if principal_id is None:
-            principal_id = self.auth.get_user_object_id()
+            principal_id = self.auth.get_user_object_id(scope="https://management.azure.com/.default")
 
         url = f"{self.ARM_API_BASE}/{scope}/providers/Microsoft.Authorization/roleEligibilitySchedules"
         params = {"api-version": "2020-10-01", "$filter": f"principalId eq '{principal_id}'"}
@@ -278,7 +284,7 @@ class PIMClient:
         ticket_system: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Request Azure AD role activation.
+        Request Entra role activation.
 
         Args:
             role_definition_id: Role definition ID
@@ -292,7 +298,7 @@ class PIMClient:
             Activation request response
         """
         if principal_id is None:
-            principal_id = self.auth.get_user_object_id()
+            principal_id = self.auth.get_user_object_id(scope="https://graph.microsoft.com/.default")
 
         url = f"{self.GRAPH_API_BETA}/roleManagement/directory/roleAssignmentScheduleRequests"
 
@@ -311,10 +317,10 @@ class PIMClient:
         if ticket_number and ticket_system:
             payload["ticketInfo"] = {"ticketNumber": ticket_number, "ticketSystem": ticket_system}
 
-        headers = self._get_headers()
+        headers = self._get_headers("https://graph.microsoft.com/.default")
 
         return self._make_request(
-            "POST", url, headers, json_data=payload, operation="activate Azure AD role"
+            "POST", url, headers, json_data=payload, operation="activate Entra role"
         )
 
     def request_resource_role_activation(
@@ -343,7 +349,7 @@ class PIMClient:
             Activation request response
         """
         if principal_id is None:
-            principal_id = self.auth.get_user_object_id()
+            principal_id = self.auth.get_user_object_id(scope="https://management.azure.com/.default")
 
         url = f"{self.ARM_API_BASE}/{scope}/providers/Microsoft.Authorization/roleAssignmentScheduleRequests"
 
@@ -380,7 +386,7 @@ class PIMClient:
 
     def list_pending_approvals(self, principal_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """
-        List pending approval requests for Azure AD roles.
+        List pending approval requests for Entra roles.
 
         Args:
             principal_id: Principal ID (user object ID)
@@ -389,12 +395,12 @@ class PIMClient:
             List of pending approvals
         """
         if principal_id is None:
-            principal_id = self.auth.get_user_object_id()
+            principal_id = self.auth.get_user_object_id(scope="https://graph.microsoft.com/.default")
 
         url = f"{self.GRAPH_API_BETA}/roleManagement/directory/roleAssignmentScheduleRequests"
         params = {"$filter": "status eq 'PendingApproval'"}
 
-        headers = self._get_headers()
+        headers = self._get_headers("https://graph.microsoft.com/.default")
         data = self._make_request("GET", url, headers, params, operation="list pending approvals")
 
         return data.get("value", [])
@@ -416,7 +422,7 @@ class PIMClient:
 
         payload = {"justification": justification}
 
-        headers = self._get_headers()
+        headers = self._get_headers("https://graph.microsoft.com/.default")
 
         return self._make_request(
             "POST", url, headers, json_data=payload, operation=f"approve request {request_id}"
@@ -426,7 +432,7 @@ class PIMClient:
         self, principal_id: Optional[str] = None, days: int = 30
     ) -> List[Dict[str, Any]]:
         """
-        List activation history for Azure AD roles.
+        List activation history for Entra roles.
 
         Args:
             principal_id: Principal ID (user object ID)
@@ -436,12 +442,187 @@ class PIMClient:
             List of activations
         """
         if principal_id is None:
-            principal_id = self.auth.get_user_object_id()
+            principal_id = self.auth.get_user_object_id(scope="https://graph.microsoft.com/.default")
 
         url = f"{self.GRAPH_API_BETA}/roleManagement/directory/roleAssignmentScheduleInstances"
         params = {"$filter": f"principalId eq '{principal_id}'", "$expand": "roleDefinition"}
 
-        headers = self._get_headers()
+        headers = self._get_headers("https://graph.microsoft.com/.default")
         data = self._make_request("GET", url, headers, params, operation="list activation history")
+
+        return data.get("value", [])
+
+    # Group-specific methods
+    def list_group_assignments(
+        self, principal_id: Optional[str] = None, limit: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        List PIM for Groups assignments.
+
+        Args:
+            principal_id: Principal ID (user object ID)
+            limit: Maximum number of results to return
+
+        Returns:
+            List of group assignments
+        """
+        if principal_id is None:
+            principal_id = self.auth.get_user_object_id(scope="https://graph.microsoft.com/.default")
+
+        # PIM for Groups uses privilegedAccess/azureADGroups
+        url = f"{self.GRAPH_API_BETA}/identityGovernance/privilegedAccess/group/eligibilitySchedules"
+        params = {"$filter": f"principalId eq '{principal_id}'", "$expand": "group"}
+
+        headers = self._get_headers("https://graph.microsoft.com/.default")
+        
+        all_results = []
+        while True:
+            data = self._make_request(
+                "GET", url, headers, params, operation="list group assignments"
+            )
+
+            values = data.get("value", [])
+            all_results.extend(values)
+
+            if self.verbose:
+                print(f"[DEBUG] Retrieved {len(values)} group assignments (total: {len(all_results)})")
+
+            # Check if we've hit the limit
+            if limit and len(all_results) >= limit:
+                all_results = all_results[:limit]
+                break
+
+            # Handle pagination
+            next_link = data.get("@odata.nextLink")
+            if not next_link:
+                break
+
+            url = next_link
+            params = {}  # nextLink already includes params
+
+        return all_results
+
+    def activate_group_role(
+        self,
+        group_id: str,
+        access_id: str,
+        principal_id: Optional[str] = None,
+        duration: str = "PT8H",
+        justification: str = "Requested via az-pim-cli",
+        ticket_number: Optional[str] = None,
+        ticket_system: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Activate a PIM for Groups assignment.
+
+        Args:
+            group_id: Group ID
+            access_id: Access ID (member or owner)
+            principal_id: Principal ID (user object ID)
+            duration: Duration in ISO 8601 format
+            justification: Justification for activation
+            ticket_number: Optional ticket number
+            ticket_system: Optional ticket system
+
+        Returns:
+            Activation request response
+        """
+        if principal_id is None:
+            principal_id = self.auth.get_user_object_id(scope="https://graph.microsoft.com/.default")
+
+        url = f"{self.GRAPH_API_BETA}/identityGovernance/privilegedAccess/group/assignmentScheduleRequests"
+
+        payload = {
+            "action": "selfActivate",
+            "principalId": principal_id,
+            "groupId": group_id,
+            "accessId": access_id,
+            "justification": justification,
+            "scheduleInfo": {
+                "startDateTime": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                "expiration": {"type": "afterDuration", "duration": duration},
+            },
+        }
+
+        if ticket_number and ticket_system:
+            payload["ticketInfo"] = {"ticketNumber": ticket_number, "ticketSystem": ticket_system}
+
+        headers = self._get_headers("https://graph.microsoft.com/.default")
+
+        return self._make_request(
+            "POST", url, headers, json_data=payload, operation="activate group role"
+        )
+
+    def list_group_pending_approvals(
+        self, principal_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        List pending approval requests for PIM for Groups.
+
+        Args:
+            principal_id: Principal ID (user object ID)
+
+        Returns:
+            List of pending approvals
+        """
+        if principal_id is None:
+            principal_id = self.auth.get_user_object_id(scope="https://graph.microsoft.com/.default")
+
+        url = f"{self.GRAPH_API_BETA}/identityGovernance/privilegedAccess/group/assignmentScheduleRequests"
+        params = {"$filter": "status eq 'PendingApproval'"}
+
+        headers = self._get_headers("https://graph.microsoft.com/.default")
+        data = self._make_request(
+            "GET", url, headers, params, operation="list group pending approvals"
+        )
+
+        return data.get("value", [])
+
+    def approve_group_request(
+        self, request_id: str, justification: str = "Approved via az-pim-cli"
+    ) -> Dict[str, Any]:
+        """
+        Approve a PIM for Groups assignment request.
+
+        Args:
+            request_id: Request ID to approve
+            justification: Justification for approval
+
+        Returns:
+            Approval response
+        """
+        url = f"{self.GRAPH_API_BETA}/identityGovernance/privilegedAccess/group/assignmentScheduleRequests/{request_id}/approve"
+
+        payload = {"justification": justification}
+
+        headers = self._get_headers("https://graph.microsoft.com/.default")
+
+        return self._make_request(
+            "POST", url, headers, json_data=payload, operation=f"approve group request {request_id}"
+        )
+
+    def list_group_activation_history(
+        self, principal_id: Optional[str] = None, days: int = 30
+    ) -> List[Dict[str, Any]]:
+        """
+        List activation history for PIM for Groups.
+
+        Args:
+            principal_id: Principal ID (user object ID)
+            days: Number of days to look back
+
+        Returns:
+            List of activations
+        """
+        if principal_id is None:
+            principal_id = self.auth.get_user_object_id(scope="https://graph.microsoft.com/.default")
+
+        url = f"{self.GRAPH_API_BETA}/identityGovernance/privilegedAccess/group/assignmentScheduleInstances"
+        params = {"$filter": f"principalId eq '{principal_id}'", "$expand": "group"}
+
+        headers = self._get_headers("https://graph.microsoft.com/.default")
+        data = self._make_request(
+            "GET", url, headers, params, operation="list group activation history"
+        )
 
         return data.get("value", [])
