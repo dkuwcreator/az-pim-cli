@@ -45,7 +45,7 @@ def should_use_ipv4_only() -> bool:
     Returns:
         True if IPv4-only mode is enabled
     """
-    return os.environ.get("AZ_PIM_IPV4_ONLY", "").lower() in ("1", "true", "yes")
+    return os.environ.get("AZ_PIM_IPV4_ONLY", "").strip().lower() in ("1", "true", "yes")
 
 
 class AzureAuth:
@@ -233,7 +233,14 @@ class AzureAuth:
         Raises:
             RuntimeError: If object ID cannot be determined
         """
-        object_id = self._extract_token_claim("https://graph.microsoft.com/.default", "oid")
+        # Prefer ARM token claims.
+        # For Azure RBAC/PIM operations we should not require a Graph token,
+        # and the ARM access token typically includes the same `oid` claim.
+        object_id = self._extract_token_claim("https://management.azure.com/.default", "oid")
+
+        # Fallback for directory-role / Graph-only scenarios.
+        if not object_id:
+            object_id = self._extract_token_claim("https://graph.microsoft.com/.default", "oid")
 
         if object_id:
             return object_id

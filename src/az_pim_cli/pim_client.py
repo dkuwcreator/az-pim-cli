@@ -1,7 +1,8 @@
 """Azure PIM API client."""
 
 import os
-from datetime import datetime, timezone
+import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -138,7 +139,16 @@ class PIMClient:
 
                 hint = ""
                 if suggest_ipv4:
-                    hint = " Try enabling IPv4-only mode: export AZ_PIM_IPV4_ONLY=1"
+                    if should_use_ipv4_only():
+                        hint = (
+                            " IPv4-only mode is already enabled (AZ_PIM_IPV4_ONLY=1). "
+                            "This looks like a DNS resolution issue; check your DNS/proxy/network settings."
+                        )
+                    else:
+                        if os.name == "nt":
+                            hint = " Try enabling IPv4-only mode: $env:AZ_PIM_IPV4_ONLY=1"
+                        else:
+                            hint = " Try enabling IPv4-only mode: export AZ_PIM_IPV4_ONLY=1"
 
                 raise NetworkError(
                     f"Connection error during {operation}: {str(e)}{hint}",
@@ -229,11 +239,21 @@ class PIMClient:
         Returns:
             List of role assignments
         """
+        # Prefer schedule instances + asTarget() to match Azure Portal behavior and
+        # avoid requiring any Graph token/permissions for RBAC PIM.
+        url = (
+            f"{self.ARM_API_BASE}/{scope}/providers/Microsoft.Authorization/roleEligibilityScheduleInstances"
+        )
         if principal_id is None:
-            principal_id = self.auth.get_user_object_id()
-
-        url = f"{self.ARM_API_BASE}/{scope}/providers/Microsoft.Authorization/roleEligibilitySchedules"
-        params = {"api-version": "2020-10-01", "$filter": f"principalId eq '{principal_id}'"}
+            params = {
+                "api-version": "2020-10-01",
+                "$filter": "asTarget()",
+            }
+        else:
+            params = {
+                "api-version": "2020-10-01",
+                "$filter": f"principalId eq '{principal_id}'",
+            }
 
         headers = self._get_headers("https://management.azure.com/.default")
 
@@ -345,7 +365,11 @@ class PIMClient:
         if principal_id is None:
             principal_id = self.auth.get_user_object_id()
 
-        url = f"{self.ARM_API_BASE}/{scope}/providers/Microsoft.Authorization/roleAssignmentScheduleRequests"
+        # ARM create is modeled as a PUT on a named request resource.
+        request_name = str(uuid.uuid4())
+        url = (
+            f"{self.ARM_API_BASE}/{scope}/providers/Microsoft.Authorization/roleAssignmentScheduleRequests/{request_name}"
+        )
 
         payload = {
             "properties": {
@@ -445,3 +469,79 @@ class PIMClient:
         data = self._make_request("GET", url, headers, params, operation="list activation history")
 
         return data.get("value", [])
+
+    def list_resource_activation_history(
+        self,
+        scope: str,
+        days: int = 30,
+        limit: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """List activation requests for Azure resource roles (RBAC PIM).
+
+        Azure's ARM Authorization provider supports filtering to the current user via
+        `$filter=asRequestor()`, avoiding any need for Microsoft Graph permissions.
+
+        Args:
+            scope: Resource scope (e.g., subscriptions/{id})
+            days: Number of days to look back
+            limit: Maximum number of results to return
+
+        Returns:
+            List of schedule request resources
+        """
+        url = (
+            f"{self.ARM_API_BASE}/{scope}/providers/Microsoft.Authorization/roleAssignmentScheduleRequests"
+        )
+        params: Dict[str, Any] = {
+            "api-version": "2020-10-01",
+            "$filter": "asRequestor()",
+        }
+
+        headers = self._get_headers("https://management.azure.com/.default")
+        all_results: List[Dict[str, Any]] = []
+
+        lookback_cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+
+        while True:
+            data = self._make_request(
+                "GET",
+                url,
+                headers,
+                params,
+                operation=f"list resource activation history for scope {scope}",
+            )
+
+            values = data.get("value", [])
+            for item in values:
+                props = item.get("properties", {})
+                created_on = props.get("createdOn")
+                start_date_time = props.get("scheduleInfo", {}).get("startDateTime")
+                dt_str = created_on or start_date_time
+                if not dt_str:
+                    all_results.append(item)
+                    continue
+
+                try:
+                    dt = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
+                    if dt >= lookback_cutoff:
+                        all_results.append(item)
+                except Exception:
+                    all_results.append(item)
+
+            if self.verbose:
+                print(
+                    f"[DEBUG] Retrieved {len(values)} requests (kept: {len(all_results)}) for scope {scope}"
+                )
+
+            if limit and len(all_results) >= limit:
+                all_results = all_results[:limit]
+                break
+
+            next_link = data.get("nextLink")
+            if not next_link:
+                break
+
+            url = next_link
+            params = {}
+
+        return all_results

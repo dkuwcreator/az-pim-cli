@@ -1,6 +1,7 @@
 """Main CLI module for Azure PIM CLI."""
 
 import os
+import sys
 from typing import Optional
 
 import typer
@@ -242,7 +243,21 @@ def list_roles(
                 console.print(f"[blue]Duration:[/blue] {duration_str}")
                 console.print(f"[blue]Justification:[/blue] {justification_input}")
 
-                if resource:
+                # If the user didn't specify --resource but the selected role looks like an
+                # Azure RBAC role (ARM roleDefinitionId + non-directory scope), activate via ARM.
+                inferred_resource = (
+                    (not resource)
+                    and bool(selected_role.scope)
+                    and selected_role.scope != "/"
+                    and selected_role.id.startswith(
+                        "/providers/Microsoft.Authorization/roleDefinitions/"
+                    )
+                )
+
+                if resource or inferred_resource:
+                    if inferred_resource and not resource:
+                        scope = scope or selected_role.scope.lstrip("/")
+
                     if not scope:
                         subscription_id = auth.get_subscription_id()
                         scope = f"subscriptions/{subscription_id}"
@@ -333,6 +348,39 @@ def activate_role(
 
         role_id = None
 
+        def is_interactive() -> bool:
+            try:
+                return sys.stdin.isatty()
+            except Exception:
+                return False
+
+        def ensure_scope(current_scope: Optional[str]) -> str:
+            if current_scope:
+                return current_scope
+            default_sub = auth.get_subscription_id()
+            default_scope = f"subscriptions/{default_sub}"
+            if is_interactive():
+                return typer.prompt("Enter scope", default=default_scope)
+            return default_scope
+
+        def ensure_ticket_fields() -> tuple[Optional[str], Optional[str]]:
+            if (ticket and ticket_system) or (not ticket and not ticket_system):
+                return ticket, ticket_system
+
+            if not is_interactive():
+                # Non-interactive: don't surprise with prompts; ignore incomplete ticket info.
+                return None, None
+
+            if ticket and not ticket_system:
+                return ticket, typer.prompt("Ticket system name")
+            if ticket_system and not ticket:
+                return typer.prompt("Ticket number"), ticket_system
+
+            return None, None
+
+        def looks_like_arm_role_definition_id(value: str) -> bool:
+            return value.startswith("/providers/Microsoft.Authorization/roleDefinitions/")
+
         # Check if role is a number reference (e.g., "#1" or "1")
         if role.startswith("#") or role.isdigit():
             try:
@@ -383,6 +431,13 @@ def activate_role(
                 role_id = selected_role.id
                 console.print(f"[green]Selected:[/green] {selected_role.name}")
 
+                # If the selection looks like an Azure RBAC role, route activation through the
+                # ARM resource-role path even if --resource wasn't specified.
+                if (not resource) and selected_role.scope and selected_role.scope != "/":
+                    if role_id.startswith("/providers/Microsoft.Authorization/roleDefinitions/"):
+                        resource = True
+                        scope = scope or selected_role.scope.lstrip("/")
+
         # Check if role is an alias
         if not role_id and config.get_alias(role):
             alias = config.get_alias(role)
@@ -392,7 +447,11 @@ def activate_role(
             role_id = alias.get("role")
             if not role_id:
                 console.print("[yellow]Alias is missing 'role' field.[/yellow]")
-                role_id = typer.prompt("Enter role name or ID")
+                if is_interactive():
+                    role_id = typer.prompt("Enter role name or ID")
+                else:
+                    console.print("[red]Role name or ID is required when using an alias without a 'role'. Pass a role or update the alias configuration.[/red]")
+                    raise typer.Exit(1)
 
             # Merge alias defaults with command-line overrides
             duration = duration or parse_duration_from_alias(alias.get("duration"))
@@ -405,10 +464,13 @@ def activate_role(
                     resource = True
                     subscription = alias.get("subscription")
                     if not subscription:
-                        # Prompt for subscription if missing
-                        subscription = typer.prompt(
-                            "Enter subscription ID", default=auth.get_subscription_id()
-                        )
+                        # Prompt for subscription if missing (TTY) or use current subscription (non-TTY)
+                        if is_interactive():
+                            subscription = typer.prompt(
+                                "Enter subscription ID", default=auth.get_subscription_id()
+                            )
+                        else:
+                            subscription = auth.get_subscription_id()
                     scope = scope or f"subscriptions/{subscription}"
                     if alias.get("resource_group"):
                         scope = scope or f"{scope}/resourceGroups/{alias['resource_group']}"
@@ -421,14 +483,83 @@ def activate_role(
                     "[yellow]Resource scope is required for resource role activation.[/yellow]"
                 )
                 default_sub = auth.get_subscription_id()
-                scope = typer.prompt("Enter scope", default=f"subscriptions/{default_sub}")
+                if is_interactive():
+                    scope = typer.prompt("Enter scope", default=f"subscriptions/{default_sub}")
+                else:
+                    scope = f"subscriptions/{default_sub}"
         elif not role_id:
             role_id = role
+
+        # If activating a resource role, prompt/derive missing info and resolve role names.
+        if resource:
+            scope = ensure_scope(scope)
+
+            if role_id and not looks_like_arm_role_definition_id(role_id):
+                # Resolve a display name (e.g., "Owner") to the roleDefinitionId at this scope.
+                roles_data = client.list_resource_role_assignments(scope)
+                azure_roles = normalize_roles(roles_data, source=RoleSource.ARM)
+                matches = [r for r in azure_roles if r.name.lower() == role_id.lower()]
+
+                if not matches:
+                    console.print(
+                        f"[red]Couldn't find an eligible resource role named '{escape(role_id)}' at scope '{escape(scope)}'.[/red]"
+                    )
+                    console.print("[yellow]Tip:[/yellow] Run 'az-pim list --resource --scope <scope>' and activate by number.")
+                    raise typer.Exit(1)
+
+                if len(matches) == 1:
+                    role_id = matches[0].id
+                else:
+                    if not is_interactive():
+                        console.print(
+                            f"[red]Multiple eligible roles named '{escape(role_id)}' found at scope '{escape(scope)}'.[/red]"
+                        )
+                        console.print("[yellow]Tip:[/yellow] Activate by number (from 'az-pim list --resource') or pass the full roleDefinitionId.")
+                        raise typer.Exit(1)
+
+                    console.print(
+                        f"[yellow]Multiple matches for '{escape(role_id)}'. Select the one to activate:[/yellow]"
+                    )
+                    match_table = Table(show_header=True, header_style="bold magenta")
+                    match_table.add_column("#", style="bold white", justify="right", width=4)
+                    match_table.add_column("Role", style="cyan")
+                    match_table.add_column("Scope", style="dim")
+                    match_table.add_column("RoleDefinitionId", style="dim")
+                    for idx, m in enumerate(matches, start=1):
+                        match_table.add_row(str(idx), m.name, m.get_short_scope(), m.id)
+                    console.print(match_table)
+
+                    selection = typer.prompt("Enter selection", default="1")
+                    try:
+                        sel_idx = int(selection)
+                        if sel_idx < 1 or sel_idx > len(matches):
+                            raise ValueError
+                    except ValueError:
+                        console.print("[red]Invalid selection.[/red]")
+                        raise typer.Exit(1)
+                    role_id = matches[sel_idx - 1].id
+
+        # Prompt for missing required inputs with defaults implied by TTY
+        if is_interactive() and duration is None:
+            # Suggest default duration from config (e.g., PT8H) or fallback to 8 hours
+            default_dur = parse_duration_from_alias(config.get_default("duration")) or 8.0
+            dur_input = typer.prompt("Enter duration (hours)", default=str(int(default_dur)))
+            try:
+                duration = float(dur_input)
+            except ValueError:
+                console.print("[red]Invalid duration. Please enter a number of hours (e.g., 8).[/red]")
+                raise typer.Exit(1)
+
+        if is_interactive() and not justification:
+            default_just = config.get_default("justification") or "Requested via az-pim-cli"
+            justification = typer.prompt("Enter justification", default=default_just)
 
         duration_str = get_duration_string(duration)
         justification = (
             justification or config.get_default("justification") or "Requested via az-pim-cli"
         )
+
+        ticket_value, ticket_system_value = ensure_ticket_fields()
 
         console.print(f"\n[bold blue]Activating role:[/bold blue] {role_id}")
         console.print(f"[blue]Duration:[/blue] {duration_str}")
@@ -445,8 +576,8 @@ def activate_role(
                 role_definition_id=role_id,
                 duration=duration_str,
                 justification=justification,
-                ticket_number=ticket,
-                ticket_system=ticket_system,
+                ticket_number=ticket_value,
+                ticket_system=ticket_system_value,
             )
         else:
             console.print()
@@ -454,8 +585,8 @@ def activate_role(
                 role_definition_id=role_id,
                 duration=duration_str,
                 justification=justification,
-                ticket_number=ticket,
-                ticket_system=ticket_system,
+                ticket_number=ticket_value,
+                ticket_system=ticket_system_value,
             )
 
         console.print("[bold green]✓ Role activation requested successfully![/bold green]")
@@ -497,6 +628,9 @@ def activate_role(
 def view_history(
     days: int = typer.Option(30, "--days", "-d", help="Number of days to look back"),
     resource: bool = typer.Option(False, "--resource", "-r", help="Show resource role history"),
+    scope: Optional[str] = typer.Option(
+        None, "--scope", "-s", help="Scope for resource roles (e.g., subscriptions/{id})"
+    ),
 ) -> None:
     """View activation history."""
     try:
@@ -505,33 +639,82 @@ def view_history(
 
         console.print(f"[bold blue]Fetching activation history (last {days} days)...[/bold blue]")
 
-        activations = client.list_activation_history(days=days)
+        if resource:
+            if not scope:
+                subscription_id = auth.get_subscription_id()
+                scope = f"subscriptions/{subscription_id}"
+            activations = client.list_resource_activation_history(scope=scope, days=days)
+        else:
+            activations = client.list_activation_history(days=days)
 
         if not activations:
             console.print("[yellow]No activation history found.[/yellow]")
             return
 
-        console.print("\n[bold green]Activation History[/bold green]\n")
+        title = "Resource Role Activation History" if resource else "Activation History"
+        console.print(f"\n[bold green]{title}[/bold green]\n")
 
         table = Table(show_header=True, header_style="bold magenta")
-        table.add_column("Role Name", style="cyan")
-        table.add_column("Start Time", style="dim")
-        table.add_column("End Time", style="dim")
-        table.add_column("Status", style="green")
+        if resource:
+            table.add_column("Role", style="cyan")
+            table.add_column("Scope", style="dim")
+            table.add_column("Request Type", style="dim")
+            table.add_column("Status", style="green")
+            table.add_column("Created", style="dim")
 
-        for activation in activations:
-            role_def = activation.get("roleDefinition", {})
-            role_name = role_def.get("displayName", "Unknown")
-            start_time = activation.get("startDateTime", "N/A")
-            end_time = activation.get("endDateTime", "N/A")
-            status = "Active"
+            for req in activations:
+                props = req.get("properties", {})
+                expanded = props.get("expandedProperties", {})
+                role_def = expanded.get("roleDefinition", {})
+                role_name = role_def.get("displayName") or props.get("roleDefinitionId", "Unknown")
+                req_scope = props.get("scope", scope or "")
+                request_type = props.get("requestType", "N/A")
+                status = props.get("status", "N/A")
+                created = props.get("createdOn", "N/A")
 
-            table.add_row(role_name, start_time, end_time, status)
+                table.add_row(role_name, req_scope, request_type, status, created)
+        else:
+            table.add_column("Role Name", style="cyan")
+            table.add_column("Start Time", style="dim")
+            table.add_column("End Time", style="dim")
+            table.add_column("Status", style="green")
+
+            for activation in activations:
+                role_def = activation.get("roleDefinition", {})
+                role_name = role_def.get("displayName", "Unknown")
+                start_time = activation.get("startDateTime", "N/A")
+                end_time = activation.get("endDateTime", "N/A")
+                status = "Active"
+
+                table.add_row(role_name, start_time, end_time, status)
 
         console.print(table)
 
-    except Exception as e:
+    except AuthenticationError as e:
+        console.print(f"[bold red]Authentication Error:[/bold red] {str(e)}")
+        if e.suggestion:
+            console.print(f"[yellow]Suggestion:[/yellow] {e.suggestion}")
+        raise typer.Exit(1)
+    except NetworkError as e:
+        console.print(f"[bold red]Network Error:[/bold red] {str(e)}")
+        if e.endpoint:
+            console.print(f"[dim]Endpoint: {e.endpoint}[/dim]")
+        if e.suggest_ipv4:
+            console.print("[yellow]💡 Tip:[/yellow] Try enabling IPv4-only mode:")
+            console.print("   export AZ_PIM_IPV4_ONLY=1")
+        raise typer.Exit(1)
+    except PIMPermissionError as e:
+        console.print(f"[bold red]Permission Error:[/bold red] {str(e)}")
+        if e.endpoint:
+            console.print(f"[dim]Endpoint: {e.endpoint}[/dim]")
+        if e.required_permissions:
+            console.print(f"[yellow]Required permissions:[/yellow] {e.required_permissions}")
+        raise typer.Exit(1)
+    except PIMError as e:
         console.print(f"[bold red]Error:[/bold red] {str(e)}")
+        raise typer.Exit(1)
+    except Exception as e:
+        console.print(f"[bold red]Unexpected Error:[/bold red] {str(e)}")
         raise typer.Exit(1)
 
 

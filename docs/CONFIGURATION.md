@@ -97,6 +97,12 @@ Durations use ISO 8601 format:
 - `subscription` - Subscription-level resource role
 - `resource` - Resource-specific role (requires full scope path)
 
+## Prompting Behavior
+
+- Interactivity is implied by TTY: when running in a terminal, missing required inputs (duration, justification, scope, ticket pair) prompt with defaults sourced from this config or the current subscription.
+- In non-TTY/automation, missing required inputs fail fast instead of prompting. Provide required values via flags or update the config/alias.
+- Ticket info is only sent when both `ticket` and `ticket-system` are supplied; incomplete pairs are ignored in non-TTY and prompted to complete in TTY.
+
 ## Advanced Configuration
 
 ### Using Resource-Specific Scopes

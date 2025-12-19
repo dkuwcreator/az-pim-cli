@@ -52,3 +52,101 @@ def test_alias_list_shows_description_column() -> None:
     # Check that the Description column is present in the output
     # (should appear even if no aliases are configured)
     assert "Description" in result.stdout or "No aliases configured" in result.stdout
+
+
+def test_activate_alias_missing_role_non_tty(monkeypatch) -> None:
+    """Missing alias role errors without prompting when not a TTY."""
+    import types
+    import az_pim_cli.cli as cli
+
+    class FakeConfig:
+        def __init__(self) -> None:
+            pass
+
+        def get_alias(self, name: str):
+            if name == "alias-missing-role":
+                return {"scope": "directory"}
+            return None
+
+        def get_default(self, key: str):
+            return None
+
+    class FakeAuth:
+        def __init__(self) -> None:
+            pass
+
+        def get_subscription_id(self) -> str:
+            return "sub-id"
+
+    class FakeClient:
+        def __init__(self, *_args, **_kwargs) -> None:
+            pass
+
+    monkeypatch.setattr(cli, "Config", FakeConfig)
+    monkeypatch.setattr(cli, "AzureAuth", FakeAuth)
+    monkeypatch.setattr(cli, "PIMClient", FakeClient)
+    monkeypatch.setattr(cli, "sys", types.SimpleNamespace(stdin=types.SimpleNamespace(isatty=lambda: False)))
+
+    result = runner.invoke(cli.app, ["activate", "alias-missing-role"])
+    assert result.exit_code != 0
+    assert "Role name or ID is required" in result.stdout
+
+
+def test_activate_prompts_defaults_when_tty(monkeypatch) -> None:
+    """TTY activation prompts for duration/justification and applies defaults."""
+    import types
+    import az_pim_cli.cli as cli
+
+    captured = {}
+
+    class FakeConfig:
+        def __init__(self) -> None:
+            pass
+
+        def get_alias(self, _name: str):
+            return None
+
+        def get_default(self, key: str):
+            if key == "duration":
+                return "PT4H"
+            if key == "justification":
+                return "Default just"
+            return None
+
+    class FakeAuth:
+        def __init__(self) -> None:
+            pass
+
+        def get_subscription_id(self) -> str:
+            return "sub-id"
+
+    class FakeClient:
+        def __init__(self, *_args, **_kwargs) -> None:
+            pass
+
+        def request_role_activation(
+            self,
+            role_definition_id: str,
+            duration: str,
+            justification: str,
+            ticket_number,
+            ticket_system,
+        ):
+            captured["payload"] = {
+                "role_definition_id": role_definition_id,
+                "duration": duration,
+                "justification": justification,
+                "ticket_number": ticket_number,
+                "ticket_system": ticket_system,
+            }
+            return {"id": "req-123"}
+
+    monkeypatch.setattr(cli, "Config", FakeConfig)
+    monkeypatch.setattr(cli, "AzureAuth", FakeAuth)
+    monkeypatch.setattr(cli, "PIMClient", FakeClient)
+    monkeypatch.setattr(cli, "sys", types.SimpleNamespace(stdin=types.SimpleNamespace(isatty=lambda: True)))
+
+    result = runner.invoke(cli.app, ["activate", "62e90394-69f5-4237-9190-012177145e10"], input="\n\n")
+    assert result.exit_code == 0
+    assert captured["payload"]["duration"] == "PT4H"
+    assert captured["payload"]["justification"] == "Default just"

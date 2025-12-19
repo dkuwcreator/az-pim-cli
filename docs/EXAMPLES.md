@@ -51,6 +51,23 @@ az-pim activate 1 --duration 4 --justification "Quick access"
 az-pim activate "#3" --duration 2 --justification "Emergency access"
 ```
 
+### Prompting and Defaults
+
+When running in a TTY, missing required inputs are prompted with sensible defaults:
+
+```bash
+# Duration and justification prompt with defaults from config (or 8h/"Requested via az-pim-cli")
+az-pim activate "User Administrator"
+
+# Ticket prompts only when partial ticket info is supplied
+az-pim activate "Privileged Role Administrator" --ticket INC123456
+
+# Alias missing subscription uses current subscription automatically in non-TTY; prompts in TTY
+az-pim activate prod-access --resource --scope "subscriptions/<sub-id>"  # scope still required for resource roles
+```
+
+Non-TTY runs will fail fast if required fields are missing (e.g., alias without a role) and will not hang waiting for input. Provide required values via flags in automation.
+
 ### Activate Resource Roles
 
 ```bash
