@@ -150,3 +150,142 @@ def test_activate_prompts_defaults_when_tty(monkeypatch) -> None:
     assert result.exit_code == 0
     assert captured["payload"]["duration"] == "PT4H"
     assert captured["payload"]["justification"] == "Default just"
+
+
+def test_activate_no_role_non_tty_errors(monkeypatch) -> None:
+    """Activation without a role should error in non-interactive mode."""
+    import types
+    import az_pim_cli.cli as cli
+
+    class FakeConfig:
+        def __init__(self) -> None:
+            pass
+
+        def get_alias(self, _name: str):
+            return None
+
+        def get_default(self, _key: str):
+            return None
+
+        def list_aliases(self):
+            return {}
+
+    class FakeAuth:
+        def __init__(self) -> None:
+            pass
+
+        def get_subscription_id(self) -> str:
+            return "sub-id"
+
+    class FakeClient:
+        def __init__(self, *_args, **_kwargs) -> None:
+            pass
+
+        def list_role_assignments(self):
+            return []
+
+    monkeypatch.setattr(cli, "Config", FakeConfig)
+    monkeypatch.setattr(cli, "AzureAuth", FakeAuth)
+    monkeypatch.setattr(cli, "PIMClient", FakeClient)
+    monkeypatch.setattr(
+        cli,
+        "sys",
+        types.SimpleNamespace(stdin=types.SimpleNamespace(isatty=lambda: False)),
+    )
+
+    result = runner.invoke(cli.app, ["activate"])
+    assert result.exit_code != 0
+    assert "Role name or ID is required" in result.stdout
+
+
+def test_activate_no_role_interactive_search(monkeypatch) -> None:
+    """Interactive no-arg activation searches with fuzzy support and activates."""
+    import types
+    import az_pim_cli.cli as cli
+
+    captured = {}
+
+    class FakeRole:
+        def __init__(self) -> None:
+            self.id = "role-id"
+            self.name = "Owner"
+            self.scope = "/"
+            self.resource_name = None
+            self.resource_type = None
+            self.membership_type = None
+            self.condition = None
+            self.end_time = None
+            self.is_alias = False
+
+        def get_short_scope(self):
+            return "/"
+
+    class FakeConfig:
+        def __init__(self) -> None:
+            pass
+
+        def get_alias(self, _name: str):
+            return None
+
+        def get_default(self, key: str):
+            if key == "duration":
+                return "PT1H"
+            if key == "justification":
+                return "Default just"
+            return None
+
+        def list_aliases(self):
+            return {}
+
+    class FakeAuth:
+        def __init__(self) -> None:
+            pass
+
+        def get_subscription_id(self) -> str:
+            return "sub-id"
+
+    class FakeClient:
+        def __init__(self, *_args, **_kwargs) -> None:
+            pass
+
+        def list_role_assignments(self):
+            return ["dummy"]
+
+        def request_role_activation(
+            self,
+            role_definition_id: str,
+            duration: str,
+            justification: str,
+            ticket_number,
+            ticket_system,
+        ):
+            captured["payload"] = {
+                "role_definition_id": role_definition_id,
+                "duration": duration,
+                "justification": justification,
+                "ticket_number": ticket_number,
+                "ticket_system": ticket_system,
+            }
+            return {"id": "req-xyz"}
+
+    def fake_normalize(_data, _source=None):
+        return [FakeRole()]
+
+    monkeypatch.setattr(cli, "Config", FakeConfig)
+    monkeypatch.setattr(cli, "AzureAuth", FakeAuth)
+    monkeypatch.setattr(cli, "PIMClient", FakeClient)
+    monkeypatch.setattr(cli, "normalize_roles", fake_normalize)
+    monkeypatch.setattr(
+        cli,
+        "sys",
+        types.SimpleNamespace(
+            stdin=types.SimpleNamespace(isatty=lambda: True),
+            stdout=types.SimpleNamespace(isatty=lambda: True),
+        ),
+    )
+
+    result = runner.invoke(cli.app, ["activate"], input="Owner\n\n\n")
+    assert result.exit_code == 0
+    assert captured["payload"]["role_definition_id"] == "role-id"
+    assert captured["payload"]["duration"] == "PT1H"
+    assert captured["payload"]["justification"] == "Default just"

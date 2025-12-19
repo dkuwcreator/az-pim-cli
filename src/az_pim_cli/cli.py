@@ -36,7 +36,7 @@ app = typer.Typer(
 console = Console()
 
 
-def get_resolver(config: Config) -> InputResolver:
+def get_resolver(config: Config, is_tty: Optional[bool] = None) -> InputResolver:
     """
     Get a configured InputResolver instance.
 
@@ -54,6 +54,7 @@ def get_resolver(config: Config) -> InputResolver:
         fuzzy_enabled=fuzzy_enabled,
         fuzzy_threshold=fuzzy_threshold,
         cache_ttl_seconds=cache_ttl,
+        is_tty=is_tty,
     )
 
 
@@ -454,8 +455,9 @@ def list_roles(
 
 @app.command("activate")
 def activate_role(
-    role: str = typer.Argument(
-        ..., help="Role name, ID, alias, or #N (number from list) to activate"
+    role: Optional[str] = typer.Argument(
+        None,
+        help="Role name, ID, alias, or #N (number from list) to activate. If omitted in a TTY, you'll be prompted to search and pick."
     ),
     duration: Optional[float] = typer.Option(None, "--duration", "-d", help="Duration in hours"),
     justification: Optional[str] = typer.Option(
@@ -513,8 +515,283 @@ def activate_role(
         def looks_like_arm_role_definition_id(value: str) -> bool:
             return value.startswith("/providers/Microsoft.Authorization/roleDefinitions/")
 
+        def load_aliases() -> tuple[list[Any], list[dict]]:
+            alias_roles: list[Any] = []
+            alias_configs: list[dict] = []
+            aliases = config.list_aliases()
+            for alias_name, alias_config in aliases.items():
+                alias_role = alias_to_normalized_role(alias_name, alias_config)
+                alias_roles.append(alias_role)
+                alias_configs.append(alias_config)
+            return alias_roles, alias_configs
+
+        def display_roles(alias_roles: list[Any], alias_configs: list[dict], azure_roles: list[Any], show_full_scope: bool = False) -> None:
+            if alias_roles:
+                console.print("[bold green]Configured Aliases[/bold green]")
+                alias_table = Table(show_header=True, header_style="bold magenta")
+                alias_table.add_column("#", style="bold white", justify="right", width=4)
+                alias_table.add_column("Alias", style="cyan")
+                alias_table.add_column("Role", style="yellow")
+                alias_table.add_column("Duration", style="green")
+                alias_table.add_column("Description", style="dim")
+                alias_table.add_column("Scope", style="dim")
+
+                for idx, (alias_role, alias_config) in enumerate(
+                    zip(alias_roles, alias_configs), start=1
+                ):
+                    alias_name = alias_role.alias_name or "Unknown"
+                    role_name = alias_role.name
+                    duration_display = alias_role.end_time if alias_role.end_time else "-"
+                    description = alias_config.get("justification", "-") if alias_config else "-"
+                    scope_display = alias_role.resource_name or (
+                        alias_role.scope if show_full_scope else alias_role.get_short_scope()
+                    )
+
+                    alias_table.add_row(
+                        str(idx),
+                        alias_name,
+                        role_name,
+                        duration_display,
+                        description,
+                        scope_display,
+                    )
+
+                console.print(alias_table)
+                console.print()
+
+            if azure_roles:
+                role_type = "Resource Roles" if resource else "Azure AD Roles"
+                console.print(f"[bold green]Eligible {role_type}[/bold green]")
+
+                roles_table = Table(show_header=True, header_style="bold magenta")
+                roles_table.add_column("#", style="bold white", justify="right", width=4)
+                roles_table.add_column("Role", style="cyan")
+                roles_table.add_column("Resource", style="yellow")
+                roles_table.add_column("Resource type", style="dim")
+                roles_table.add_column("Membership", style="dim")
+                roles_table.add_column("Condition", style="dim")
+                roles_table.add_column("End time", style="green")
+
+                for idx, role_item in enumerate(azure_roles, start=len(alias_roles) + 1):
+                    resource_display = role_item.resource_name or (
+                        role_item.scope if show_full_scope else role_item.get_short_scope()
+                    )
+                    resource_type_display = role_item.resource_type or "-"
+                    membership_display = role_item.membership_type or "Eligible"
+                    condition_display = role_item.condition if role_item.condition else "-"
+                    end_time_display = role_item.end_time if role_item.end_time else "-"
+
+                    roles_table.add_row(
+                        str(idx),
+                        role_item.name,
+                        resource_display,
+                        resource_type_display,
+                        membership_display,
+                        condition_display,
+                        end_time_display,
+                    )
+
+                console.print(roles_table)
+
+        # If no role was provided, run interactive picker (TTY only)
+        if role is None:
+            if not is_interactive():
+                console.print("[red]Role name or ID is required in non-interactive mode.[/red]")
+                raise typer.Exit(1)
+
+            console.print("[bold blue]No role provided. Fetching aliases and eligible roles...[/bold blue]")
+
+            alias_roles, alias_configs = load_aliases()
+
+            if resource:
+                scope = ensure_scope(scope)
+                roles_data = client.list_resource_role_assignments(scope)
+                console.print(f"\n[bold green]Eligible Resource Roles (Scope: {scope})[/bold green]")
+            else:
+                roles_data = client.list_role_assignments()
+                console.print("\n[bold green]Eligible Azure AD Roles[/bold green]")
+
+            azure_roles = normalize_roles(roles_data, source=RoleSource.ARM)
+            all_roles = alias_roles + azure_roles
+
+            if not all_roles:
+                console.print("[yellow]No eligible roles or aliases found.[/yellow]")
+                raise typer.Exit(1)
+
+            console.print(
+                f"[dim]Found {len(alias_roles)} alias(es) and {len(azure_roles)} Azure role(s)[/dim]\n"
+            )
+
+            # Display all roles first
+            display_roles(alias_roles, alias_configs, azure_roles)
+
+            console.print()
+            console.print(
+                "[dim]Enter a number to activate, or a name/alias to filter (fuzzy matching enabled), or press Enter to cancel.[/dim]"
+            )
+            selection = typer.prompt("Select", default="")
+            
+            if not selection:
+                console.print("[yellow]Selection cancelled.[/yellow]")
+                raise typer.Exit(0)
+
+            selected_role = None
+            
+            # Check if input is a number
+            try:
+                role_idx = int(selection) - 1
+                if 0 <= role_idx < len(all_roles):
+                    selected_role = all_roles[role_idx]
+                else:
+                    console.print(f"[red]Invalid role number. Valid range: 1-{len(all_roles)}[/red]")
+                    raise typer.Exit(1)
+            except ValueError:
+                # Not a number, treat as search term
+                try:
+                    from rapidfuzz import fuzz
+                    has_rapidfuzz = True
+                except ImportError:
+                    has_rapidfuzz = False
+
+                fuzzy_threshold = config.get_default("fuzzy_threshold", 0.6)
+                
+                # Filter matches based on fuzzy matching
+                matched_roles = []
+                for idx, role in enumerate(all_roles):
+                    role_name = role.alias_name or role.name
+                    if has_rapidfuzz:
+                        score = fuzz.ratio(selection.lower(), role_name.lower()) / 100.0
+                    else:
+                        import difflib
+                        score = difflib.SequenceMatcher(None, selection.lower(), role_name.lower()).ratio()
+                    
+                    if score >= fuzzy_threshold or selection.lower() in role_name.lower():
+                        matched_roles.append((idx, role, score))
+                
+                if not matched_roles:
+                    console.print(f"[yellow]No roles match '{selection}'[/yellow]")
+                    raise typer.Exit(0)
+                
+                # Sort by score descending
+                matched_roles.sort(key=lambda x: x[2], reverse=True)
+                
+                console.print(f"\n[green]Found {len(matched_roles)} matching role(s)[/green]\n")
+                
+                # Build filtered display lists
+                filtered_alias_roles = []
+                filtered_alias_configs = []
+                filtered_azure_roles = []
+                renumbered_roles = []
+                
+                for orig_idx, role, score in matched_roles:
+                    renumbered_roles.append(role)
+                    if getattr(role, 'is_alias', False):
+                        # Find the alias config by matching the role object
+                        for i, ar in enumerate(alias_roles):
+                            if ar is role:
+                                filtered_alias_roles.append(role)
+                                filtered_alias_configs.append(alias_configs[i])
+                                break
+                    else:
+                        filtered_azure_roles.append(role)
+                
+                # Display filtered results with renumbering
+                if filtered_alias_roles:
+                    console.print("[bold green]Matching Aliases[/bold green]")
+                    alias_table = Table(show_header=True, header_style="bold magenta")
+                    alias_table.add_column("#", style="bold white", justify="right", width=4)
+                    alias_table.add_column("Alias", style="cyan")
+                    alias_table.add_column("Role", style="yellow")
+                    alias_table.add_column("Duration", style="green")
+                    alias_table.add_column("Description", style="dim")
+                    alias_table.add_column("Scope", style="dim")
+
+                    for idx, (alias_role, alias_config) in enumerate(
+                        zip(filtered_alias_roles, filtered_alias_configs), start=1
+                    ):
+                        alias_name = alias_role.alias_name or "Unknown"
+                        role_name = alias_role.name
+                        duration_display = alias_role.end_time if alias_role.end_time else "-"
+                        description = alias_config.get("justification", "-") if alias_config else "-"
+                        scope_display = alias_role.resource_name or alias_role.get_short_scope()
+
+                        alias_table.add_row(
+                            str(idx),
+                            alias_name,
+                            role_name,
+                            duration_display,
+                            description,
+                            scope_display,
+                        )
+
+                    console.print(alias_table)
+                    console.print()
+
+                if filtered_azure_roles:
+                    role_type = "Matching Resource Roles" if resource else "Matching Azure AD Roles"
+                    console.print(f"[bold green]{role_type}[/bold green]")
+
+                    roles_table = Table(show_header=True, header_style="bold magenta")
+                    roles_table.add_column("#", style="bold white", justify="right", width=4)
+                    roles_table.add_column("Role", style="cyan")
+                    roles_table.add_column("Resource", style="yellow")
+                    roles_table.add_column("Resource type", style="dim")
+
+                    start_num = len(filtered_alias_roles) + 1
+                    for idx, role_item in enumerate(filtered_azure_roles, start=start_num):
+                        resource_display = role_item.resource_name or role_item.get_short_scope()
+                        resource_type_display = role_item.resource_type or "-"
+
+                        roles_table.add_row(
+                            str(idx),
+                            role_item.name,
+                            resource_display,
+                            resource_type_display,
+                        )
+
+                    console.print(roles_table)
+                
+                console.print()
+                num_selection = typer.prompt(
+                    "Enter role number to activate (or press Enter to cancel)", default=""
+                )
+                
+                if not num_selection:
+                    console.print("[yellow]Selection cancelled.[/yellow]")
+                    raise typer.Exit(0)
+                
+                try:
+                    filtered_idx = int(num_selection) - 1
+                    if 0 <= filtered_idx < len(renumbered_roles):
+                        selected_role = renumbered_roles[filtered_idx]
+                    else:
+                        console.print(f"[red]Invalid selection. Valid range: 1-{len(renumbered_roles)}[/red]")
+                        raise typer.Exit(1)
+                except ValueError:
+                    console.print("[red]Invalid input. Please enter a number.[/red]")
+                    raise typer.Exit(1)
+            
+            if not selected_role:
+                console.print("[red]Invalid selection.[/red]")
+                raise typer.Exit(1)
+
+            # If the selected role is an alias, delegate to alias handling; otherwise use its ID
+            if getattr(selected_role, "is_alias", False):
+                role = selected_role.alias_name or search_input
+            else:
+                role_id = selected_role.id
+                role = selected_role.name
+                console.print(f"[green]Selected:[/green] {selected_role.name}")
+
+                if (not resource) and selected_role.scope and selected_role.scope != "/":
+                    if selected_role.id.startswith(
+                        "/providers/Microsoft.Authorization/roleDefinitions/"
+                    ):
+                        resource = True
+                        scope = scope or selected_role.scope.lstrip("/")
+
         # Check if role is a number reference (e.g., "#1" or "1")
-        if role.startswith("#") or role.isdigit():
+        if role and (role.startswith("#") or role.isdigit()):
             try:
                 role_num = int(role.lstrip("#"))
             except ValueError:
