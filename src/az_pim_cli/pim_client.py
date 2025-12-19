@@ -105,7 +105,11 @@ class PIMClient:
                 if response.status_code == 403:
                     try:
                         # Use Graph scope for Graph API endpoints, ARM scope for ARM endpoints
-                        scope_for_oid = "https://graph.microsoft.com/.default" if "graph.microsoft.com" in url else "https://management.azure.com/.default"
+                        # Parse URL properly to avoid substring matching vulnerabilities
+                        from urllib.parse import urlparse
+                        parsed_url = urlparse(url)
+                        is_graph_api = parsed_url.hostname == "graph.microsoft.com"
+                        scope_for_oid = "https://graph.microsoft.com/.default" if is_graph_api else "https://management.azure.com/.default"
                         principal_id = self.auth.get_user_object_id(scope=scope_for_oid)
                     except Exception:
                         principal_id = "unknown"
