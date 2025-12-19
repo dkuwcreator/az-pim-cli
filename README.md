@@ -424,6 +424,29 @@ If you encounter response parsing errors, this may indicate:
 
 ## Development
 
+### Project Architecture
+
+The project follows a clean architecture pattern with clear separation of concerns:
+
+```
+src/az_pim_cli/
+├── domain/          # Pure business logic (models, exceptions)
+├── app/             # Application services and use cases
+├── infra/           # Infrastructure adapters (HTTP, config, auth)
+├── interfaces/      # Protocol definitions (ports)
+├── cli.py           # CLI entry point
+├── pim_client.py    # PIM API client
+├── resolver.py      # Input resolution logic
+├── auth.py          # Authentication
+└── config.py        # Configuration (backward compatibility)
+```
+
+**Key Design Principles:**
+- **Domain Layer**: Contains pure business logic with no external dependencies
+- **Infrastructure Layer**: Adapters for external services (HTTP, file system, cloud APIs)
+- **Interfaces**: Protocol definitions allowing swappable implementations
+- **Backward Compatibility**: Original modules re-export from new locations
+
 ### Setup Development Environment
 
 ```bash
@@ -434,24 +457,92 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -e ".[dev]"
 ```
 
+### Development Tools
+
+The project uses modern Python tooling:
+
+- **ruff**: Fast linter and formatter (replaces black + isort + flake8)
+- **mypy**: Static type checking with strict mode
+- **pytest**: Testing framework with coverage
+- **pre-commit**: Automated code quality checks
+
 ### Run Tests
 
 ```bash
+# Run all tests
 pytest
+
+# Run with coverage
 pytest --cov=az_pim_cli
+
+# Run specific test file
+pytest tests/test_config.py -v
 ```
 
-### Code Formatting
+### Code Quality
 
 ```bash
-black src/
-flake8 src/
+# Format code
+ruff format src/ tests/
+
+# Lint code (with auto-fix)
+ruff check --fix src/ tests/
+
+# Type check
 mypy src/
+
+# Run pre-commit hooks manually
+pre-commit run --all-files
 ```
+
+### Configuration Options
+
+The CLI supports enhanced configuration via Pydantic models:
+
+**File-based** (`~/.az-pim-cli/config.yml`):
+```yaml
+aliases:
+  prod-admin:
+    role: "Contributor"
+    duration: "PT4H"
+    justification: "Production deployment"
+    scope: "subscription"
+    subscription: "{sub-id}"
+
+defaults:
+  duration: "PT8H"
+  justification: "Requested via az-pim-cli"
+  fuzzy_matching: true
+  fuzzy_threshold: 0.8
+  cache_ttl_seconds: 300
+```
+
+**Environment Variables**:
+```bash
+export AZ_PIM_IPV4_ONLY=1       # Force IPv4-only DNS
+export AZ_PIM_BACKEND=ARM       # API backend (ARM/GRAPH)
+export AZ_PIM_VERBOSE=true      # Enable verbose logging
+```
+
+### Architecture Benefits
+
+1. **Swappable Components**: HTTP client and config adapters can be replaced
+2. **Type Safety**: Pydantic validation catches configuration errors early
+3. **Testability**: Clean separation makes unit testing easier
+4. **Maintainability**: Clear boundaries reduce coupling
+5. **Backward Compatibility**: Existing code continues to work
+
+## Development
+
+### Setup Development Environment
+
+```bash
 
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+See [CHANGELOG.md](CHANGELOG.md) for recent changes and [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
 
 ## License
 

@@ -7,9 +7,10 @@ with support for exact, case-insensitive, prefix, and fuzzy matching strategies.
 import difflib
 import sys
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any
 
 from rich.console import Console
 from rich.prompt import Prompt
@@ -58,7 +59,7 @@ class InputResolver:
         fuzzy_enabled: bool = True,
         fuzzy_threshold: float = 0.8,
         cache_ttl_seconds: int = 300,
-        is_tty: Optional[bool] = None,
+        is_tty: bool | None = None,
     ):
         """
         Initialize input resolver.
@@ -73,18 +74,18 @@ class InputResolver:
         self.fuzzy_threshold = fuzzy_threshold
         self.cache_ttl_seconds = cache_ttl_seconds
         self.is_tty = is_tty if is_tty is not None else sys.stdout.isatty()
-        self._cache: Dict[str, CacheEntry] = {}
+        self._cache: dict[str, CacheEntry] = {}
         self.console = Console()
 
     def resolve(
         self,
         user_input: str,
-        candidates: List[Any],
+        candidates: list[Any],
         name_extractor: Callable[[Any], str],
         context: str = "item",
         allow_interactive: bool = True,
-        cache_key: Optional[str] = None,
-    ) -> Optional[Any]:
+        cache_key: str | None = None,
+    ) -> Any | None:
         """
         Resolve user input against candidate items.
 
@@ -129,9 +130,9 @@ class InputResolver:
     def _find_matches(
         self,
         user_input: str,
-        candidates: List[Any],
+        candidates: list[Any],
         name_extractor: Callable[[Any], str],
-    ) -> List[Match]:
+    ) -> list[Match]:
         """Find all matching candidates using various strategies."""
         # Extract names once
         candidate_names = [(c, name_extractor(c)) for c in candidates]
@@ -173,8 +174,8 @@ class InputResolver:
     def _fuzzy_match(
         self,
         user_input: str,
-        candidate_names: List[Tuple[Any, str]],
-    ) -> List[Match]:
+        candidate_names: list[tuple[Any, str]],
+    ) -> list[Match]:
         """Perform fuzzy matching using available library."""
         names = [name for _, name in candidate_names]
         name_to_candidate = {name: c for c, name in candidate_names}
@@ -221,11 +222,11 @@ class InputResolver:
 
     def _handle_multiple_matches(
         self,
-        matches: List[Match],
+        matches: list[Match],
         user_input: str,
         context: str,
         allow_interactive: bool,
-    ) -> Optional[Any]:
+    ) -> Any | None:
         """Handle multiple matches based on TTY mode."""
         if self.is_tty and allow_interactive:
             return self._interactive_select(matches, context)
@@ -233,7 +234,7 @@ class InputResolver:
             self._show_multiple_matches_error(matches, user_input, context)
             return None
 
-    def _interactive_select(self, matches: List[Match], context: str) -> Optional[Any]:
+    def _interactive_select(self, matches: list[Match], context: str) -> Any | None:
         """Show interactive selection prompt."""
         self.console.print(f"\n[yellow]Multiple {context}s match your input:[/yellow]")
 
@@ -269,7 +270,7 @@ class InputResolver:
     def _show_no_match_error(
         self,
         user_input: str,
-        candidates: List[Any],
+        candidates: list[Any],
         name_extractor: Callable[[Any], str],
         context: str,
     ) -> None:
@@ -287,13 +288,13 @@ class InputResolver:
 
     def _show_multiple_matches_error(
         self,
-        matches: List[Match],
+        matches: list[Match],
         user_input: str,
         context: str,
     ) -> None:
         """Show error for multiple matches in non-interactive mode."""
         self.console.print(
-            f"[red]✗[/red] Multiple {context}s match '{user_input}' " f"(non-interactive mode)"
+            f"[red]✗[/red] Multiple {context}s match '{user_input}' (non-interactive mode)"
         )
         self.console.print("\n[yellow]Matching candidates:[/yellow]")
         for match in matches[:5]:  # Show top 5
@@ -311,10 +312,10 @@ class InputResolver:
     def _get_suggestions(
         self,
         user_input: str,
-        candidates: List[Any],
+        candidates: list[Any],
         name_extractor: Callable[[Any], str],
         max_suggestions: int = 3,
-    ) -> List[str]:
+    ) -> list[str]:
         """Get suggested candidates for user input."""
         names = [name_extractor(c) for c in candidates]
 
@@ -334,7 +335,7 @@ class InputResolver:
                 cutoff=0.4,  # Lower threshold for suggestions
             )
 
-    def get_cached(self, key: str) -> Optional[Any]:
+    def get_cached(self, key: str) -> Any | None:
         """Get cached data if not expired."""
         if key not in self._cache:
             return None
@@ -361,9 +362,9 @@ class InputResolver:
 def resolve_scope(
     resolver: InputResolver,
     scope_input: str,
-    subscription_id: Optional[str] = None,
-    fetch_scopes_fn: Optional[Callable[[], List[Any]]] = None,
-) -> Optional[str]:
+    subscription_id: str | None = None,
+    fetch_scopes_fn: Callable[[], list[Any]] | None = None,
+) -> str | None:
     """
     Resolve a scope identifier to a full scope path.
 
@@ -431,9 +432,9 @@ def resolve_role(
     resolver: InputResolver,
     role_input: str,
     scope: str,
-    fetch_roles_fn: Callable[[], List[Any]],
+    fetch_roles_fn: Callable[[], list[Any]],
     role_name_extractor: Callable[[Any], str],
-) -> Optional[Any]:
+) -> Any | None:
     """
     Resolve a role identifier to a role object.
 
@@ -472,7 +473,7 @@ def resolve_role(
             return roles[role_number - 1]
         else:
             resolver.console.print(
-                f"[red]✗[/red] Invalid role number {role_number} " f"(must be 1-{len(roles)})"
+                f"[red]✗[/red] Invalid role number {role_number} (must be 1-{len(roles)})"
             )
             return None
 

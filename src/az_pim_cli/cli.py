@@ -2,7 +2,7 @@
 
 import os
 import sys
-from typing import Any, Optional
+from typing import Any
 
 import typer
 from rich.console import Console
@@ -13,11 +13,9 @@ from az_pim_cli.config import Config
 from az_pim_cli.exceptions import (
     AuthenticationError,
     NetworkError,
-)
-from az_pim_cli.exceptions import PermissionError as PIMPermissionError
-from az_pim_cli.exceptions import (
     PIMError,
 )
+from az_pim_cli.exceptions import PermissionError as PIMPermissionError
 from az_pim_cli.models import (
     SUBSCRIPTION_ID_DISPLAY_LENGTH,
     RoleSource,
@@ -35,7 +33,7 @@ app = typer.Typer(
 console = Console()
 
 
-def get_resolver(config: Config, is_tty: Optional[bool] = None) -> InputResolver:
+def get_resolver(config: Config, is_tty: bool | None = None) -> InputResolver:
     """
     Get a configured InputResolver instance.
 
@@ -58,7 +56,7 @@ def get_resolver(config: Config, is_tty: Optional[bool] = None) -> InputResolver
 
 
 def resolve_scope_input(
-    scope_input: str, auth: AzureAuth, client: Optional[Any] = None, config: Optional[Config] = None
+    scope_input: str, auth: AzureAuth, client: Any | None = None, config: Config | None = None
 ) -> str:
     """
     Resolve user-provided scope input to a full Azure scope path.
@@ -165,7 +163,7 @@ def resolve_scope_input(
     return f"/subscriptions/{subscription_id}/resourceGroups/{scope_input}"
 
 
-def parse_duration_from_alias(duration_str: Optional[str]) -> Optional[float]:
+def parse_duration_from_alias(duration_str: str | None) -> float | None:
     """
     Parse duration from alias configuration.
 
@@ -181,7 +179,7 @@ def parse_duration_from_alias(duration_str: Optional[str]) -> Optional[float]:
     return float(duration_str.replace("PT", "").replace("H", ""))
 
 
-def get_duration_string(hours: Optional[float] = None) -> str:
+def get_duration_string(hours: float | None = None) -> str:
     """
     Convert hours to ISO 8601 duration string.
 
@@ -201,13 +199,13 @@ def list_roles(
     resource: bool = typer.Option(
         False, "--resource", "-r", help="List resource roles instead of directory roles"
     ),
-    scope: Optional[str] = typer.Option(
+    scope: str | None = typer.Option(
         None, "--scope", "-s", help="Scope for resource roles (e.g., subscriptions/{id})"
     ),
     full_scope: bool = typer.Option(
         False, "--full-scope", help="Show full scope paths instead of shortened versions"
     ),
-    limit: Optional[int] = typer.Option(None, "--limit", "-l", help="Limit number of results"),
+    limit: int | None = typer.Option(None, "--limit", "-l", help="Limit number of results"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
     select: bool = typer.Option(
         False, "--select", help="Interactive mode: select and activate a role from the list"
@@ -456,20 +454,20 @@ def list_roles(
 
 @app.command("activate")
 def activate_role(
-    role: Optional[str] = typer.Argument(
+    role: str | None = typer.Argument(
         None,
         help="Role name, ID, alias, or #N (number from list) to activate. If omitted in a TTY, you'll be prompted to search and pick.",
     ),
-    duration: Optional[float] = typer.Option(None, "--duration", "-d", help="Duration in hours"),
-    justification: Optional[str] = typer.Option(
+    duration: float | None = typer.Option(None, "--duration", "-d", help="Duration in hours"),
+    justification: str | None = typer.Option(
         None, "--justification", "-j", help="Justification for activation"
     ),
     resource: bool = typer.Option(
         False, "--resource", "-r", help="Activate resource role instead of directory role"
     ),
-    scope: Optional[str] = typer.Option(None, "--scope", "-s", help="Scope for resource roles"),
-    ticket: Optional[str] = typer.Option(None, "--ticket", "-t", help="Ticket number"),
-    ticket_system: Optional[str] = typer.Option(None, "--ticket-system", help="Ticket system name"),
+    scope: str | None = typer.Option(None, "--scope", "-s", help="Scope for resource roles"),
+    ticket: str | None = typer.Option(None, "--ticket", "-t", help="Ticket number"),
+    ticket_system: str | None = typer.Option(None, "--ticket-system", help="Ticket system name"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
 ) -> None:
     """Activate a role."""
@@ -488,7 +486,7 @@ def activate_role(
             except Exception:
                 return False
 
-        def ensure_scope(current_scope: Optional[str]) -> str:
+        def ensure_scope(current_scope: str | None) -> str:
             if current_scope:
                 return resolve_scope_input(current_scope, auth, client, config)
 
@@ -498,7 +496,7 @@ def activate_role(
                 return typer.prompt("Enter scope", default=default_scope)
             return default_scope
 
-        def ensure_ticket_fields() -> tuple[Optional[str], Optional[str]]:
+        def ensure_ticket_fields() -> tuple[str | None, str | None]:
             if (ticket and ticket_system) or (not ticket and not ticket_system):
                 return ticket, ticket_system
 
@@ -699,7 +697,7 @@ def activate_role(
                 filtered_azure_roles = []
                 renumbered_roles = []
 
-                for orig_idx, role, score in matched_roles:
+                for _orig_idx, role, _score in matched_roles:
                     renumbered_roles.append(role)
                     if getattr(role, "is_alias", False):
                         # Find the alias config by matching the role object
@@ -1040,7 +1038,7 @@ def activate_role(
 def view_history(
     days: int = typer.Option(30, "--days", "-d", help="Number of days to look back"),
     resource: bool = typer.Option(False, "--resource", "-r", help="Show resource role history"),
-    scope: Optional[str] = typer.Option(
+    scope: str | None = typer.Option(
         None, "--scope", "-s", help="Scope for resource roles (e.g., subscriptions/{id})"
     ),
 ) -> None:
@@ -1137,7 +1135,7 @@ def view_history(
 @app.command("approve")
 def approve_request(
     request_id: str = typer.Argument(..., help="Request ID to approve"),
-    justification: Optional[str] = typer.Option(
+    justification: str | None = typer.Option(
         None, "--justification", "-j", help="Justification for approval"
     ),
 ) -> None:
@@ -1206,19 +1204,15 @@ app.add_typer(alias_app, name="alias")
 @alias_app.command("add")
 def add_alias(
     name: str = typer.Argument(..., help="Alias name"),
-    role: Optional[str] = typer.Argument(None, help="Role name or ID"),
-    duration: Optional[str] = typer.Option(None, "--duration", "-d", help="Duration (e.g., PT8H)"),
-    justification: Optional[str] = typer.Option(
-        None, "--justification", "-j", help="Justification"
-    ),
-    scope: Optional[str] = typer.Option(
-        None, "--scope", "-s", help="Scope (directory, subscription)"
-    ),
-    subscription: Optional[str] = typer.Option(None, "--subscription", help="Subscription ID"),
-    resource: Optional[str] = typer.Option(None, "--resource", help="Resource name"),
-    resource_type: Optional[str] = typer.Option(None, "--resource-type", help="Resource type"),
-    membership: Optional[str] = typer.Option(None, "--membership", help="Membership type"),
-    condition: Optional[str] = typer.Option(None, "--condition", help="Condition expression"),
+    role: str | None = typer.Argument(None, help="Role name or ID"),
+    duration: str | None = typer.Option(None, "--duration", "-d", help="Duration (e.g., PT8H)"),
+    justification: str | None = typer.Option(None, "--justification", "-j", help="Justification"),
+    scope: str | None = typer.Option(None, "--scope", "-s", help="Scope (directory, subscription)"),
+    subscription: str | None = typer.Option(None, "--subscription", help="Subscription ID"),
+    resource: str | None = typer.Option(None, "--resource", help="Resource name"),
+    resource_type: str | None = typer.Option(None, "--resource-type", help="Resource type"),
+    membership: str | None = typer.Option(None, "--membership", help="Membership type"),
+    condition: str | None = typer.Option(None, "--condition", help="Condition expression"),
 ) -> None:
     """Add a new alias."""
     try:

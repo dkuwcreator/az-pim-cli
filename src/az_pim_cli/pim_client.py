@@ -3,7 +3,7 @@
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import requests
 
@@ -18,7 +18,7 @@ class PIMClient:
     GRAPH_API_BETA = "https://graph.microsoft.com/beta"
     ARM_API_BASE = "https://management.azure.com"
 
-    def __init__(self, auth: Optional[AzureAuth] = None, verbose: bool = False) -> None:
+    def __init__(self, auth: AzureAuth | None = None, verbose: bool = False) -> None:
         """
         Initialize PIM client.
 
@@ -34,7 +34,7 @@ class PIMClient:
             print(f"[DEBUG] PIM Client initialized with backend: {self._backend}")
             print(f"[DEBUG] IPv4-only mode: {should_use_ipv4_only()}")
 
-    def _get_headers(self, scope: str = "https://graph.microsoft.com/.default") -> Dict[str, str]:
+    def _get_headers(self, scope: str = "https://graph.microsoft.com/.default") -> dict[str, str]:
         """
         Get headers with authorization token.
 
@@ -54,11 +54,11 @@ class PIMClient:
         self,
         method: str,
         url: str,
-        headers: Dict[str, str],
-        params: Optional[Dict[str, Any]] = None,
-        json_data: Optional[Dict[str, Any]] = None,
+        headers: dict[str, str],
+        params: dict[str, Any] | None = None,
+        json_data: dict[str, Any] | None = None,
         operation: str = "API request",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Make an HTTP request with enhanced error handling.
 
@@ -175,8 +175,8 @@ class PIMClient:
             return do_request()
 
     def list_role_assignments(
-        self, principal_id: Optional[str] = None, limit: Optional[int] = None
-    ) -> List[Dict[str, Any]]:
+        self, principal_id: str | None = None, limit: int | None = None
+    ) -> list[dict[str, Any]]:
         """
         List Azure AD role assignments for the user.
         Uses ARM API with asTarget() filter instead of Graph API to avoid permission issues.
@@ -226,8 +226,8 @@ class PIMClient:
         return all_results
 
     def list_resource_role_assignments(
-        self, scope: str, principal_id: Optional[str] = None, limit: Optional[int] = None
-    ) -> List[Dict[str, Any]]:
+        self, scope: str, principal_id: str | None = None, limit: int | None = None
+    ) -> list[dict[str, Any]]:
         """
         List Azure resource role assignments.
 
@@ -289,12 +289,12 @@ class PIMClient:
     def request_role_activation(
         self,
         role_definition_id: str,
-        principal_id: Optional[str] = None,
+        principal_id: str | None = None,
         duration: str = "PT8H",
         justification: str = "Requested via az-pim-cli",
-        ticket_number: Optional[str] = None,
-        ticket_system: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        ticket_number: str | None = None,
+        ticket_system: str | None = None,
+    ) -> dict[str, Any]:
         """
         Request Azure AD role activation.
 
@@ -339,12 +339,12 @@ class PIMClient:
         self,
         scope: str,
         role_definition_id: str,
-        principal_id: Optional[str] = None,
+        principal_id: str | None = None,
         duration: str = "PT8H",
         justification: str = "Requested via az-pim-cli",
-        ticket_number: Optional[str] = None,
-        ticket_system: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        ticket_number: str | None = None,
+        ticket_system: str | None = None,
+    ) -> dict[str, Any]:
         """
         Request Azure resource role activation.
 
@@ -398,7 +398,7 @@ class PIMClient:
             operation=f"activate resource role on scope {scope}",
         )
 
-    def list_pending_approvals(self, principal_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def list_pending_approvals(self, principal_id: str | None = None) -> list[dict[str, Any]]:
         """
         List pending approval requests for Azure AD roles.
 
@@ -421,7 +421,7 @@ class PIMClient:
 
     def approve_request(
         self, request_id: str, justification: str = "Approved via az-pim-cli"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Approve a role assignment request.
 
@@ -443,8 +443,8 @@ class PIMClient:
         )
 
     def list_activation_history(
-        self, principal_id: Optional[str] = None, days: int = 30
-    ) -> List[Dict[str, Any]]:
+        self, principal_id: str | None = None, days: int = 30
+    ) -> list[dict[str, Any]]:
         """
         List activation history for Azure AD roles.
 
@@ -470,8 +470,8 @@ class PIMClient:
         self,
         scope: str,
         days: int = 30,
-        limit: Optional[int] = None,
-    ) -> List[Dict[str, Any]]:
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
         """List activation requests for Azure resource roles (RBAC PIM).
 
         Azure's ARM Authorization provider supports filtering to the current user via
@@ -486,13 +486,13 @@ class PIMClient:
             List of schedule request resources
         """
         url = f"{self.ARM_API_BASE}/{scope}/providers/Microsoft.Authorization/roleAssignmentScheduleRequests"
-        params: Dict[str, Any] = {
+        params: dict[str, Any] = {
             "api-version": "2020-10-01",
             "$filter": "asRequestor()",
         }
 
         headers = self._get_headers("https://management.azure.com/.default")
-        all_results: List[Dict[str, Any]] = []
+        all_results: list[dict[str, Any]] = []
 
         lookback_cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
