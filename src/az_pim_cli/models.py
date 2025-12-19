@@ -115,7 +115,7 @@ def normalize_arm_role(arm_response: Dict[str, Any]) -> NormalizedRole:
     role_id = props.get("roleDefinitionId", "")
     status = props.get("status", "Active")
     scope = props.get("scope", scope_info.get("id", ""))
-    
+
     # Extract portal-equivalent fields
     resource_name = scope_info.get("displayName")
     resource_type = scope_info.get("type")
@@ -204,10 +204,10 @@ def alias_to_normalized_role(alias_name: str, alias_config: Dict[str, Any]) -> N
     """
     role_name = alias_config.get("role", alias_name)
     role_id = alias_config.get("role", "")
-    
+
     # For display purposes, show as "Eligible" for aliases
     status = "Eligible"
-    
+
     # Build scope from alias config
     scope = ""
     if alias_config.get("scope") == "subscription":
@@ -218,13 +218,13 @@ def alias_to_normalized_role(alias_name: str, alias_config: Dict[str, Any]) -> N
                 scope += f"/resourceGroups/{alias_config['resource_group']}"
     elif alias_config.get("scope") == "directory":
         scope = "/"
-    
+
     # Extract other fields
     resource_name = alias_config.get("resource")
     resource_type = alias_config.get("resource_type")
     membership_type = alias_config.get("membership")
     condition = alias_config.get("condition")
-    
+
     # Convert duration to end_time format for display
     end_time = None
     if alias_config.get("duration"):
@@ -233,7 +233,7 @@ def alias_to_normalized_role(alias_name: str, alias_config: Dict[str, Any]) -> N
         if duration_str.startswith("PT") and "H" in duration_str:
             hours = duration_str.replace("PT", "").replace("H", "")
             end_time = f"Duration: {hours}h"
-    
+
     return NormalizedRole(
         name=role_name,
         id=role_id,

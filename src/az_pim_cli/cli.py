@@ -79,7 +79,7 @@ def list_roles(
     """List eligible roles."""
     try:
         from az_pim_cli.models import alias_to_normalized_role
-        
+
         auth = AzureAuth()
         client = PIMClient(auth, verbose=verbose)
         config = Config()
@@ -106,14 +106,14 @@ def list_roles(
 
         # Normalize responses from Azure
         azure_roles = normalize_roles(roles_data, source=RoleSource.ARM)
-        
+
         # Load aliases and convert to NormalizedRole objects
         aliases = config.list_aliases()
         alias_roles = []
         for alias_name, alias_config in aliases.items():
             alias_role = alias_to_normalized_role(alias_name, alias_config)
             alias_roles.append(alias_role)
-        
+
         # Combine aliases first, then Azure roles
         roles = alias_roles + azure_roles
 
@@ -121,7 +121,9 @@ def list_roles(
             console.print("[yellow]No eligible roles found.[/yellow]")
             return
 
-        console.print(f"[dim]Found {len(alias_roles)} alias(es) and {len(azure_roles)} Azure role(s)[/dim]\n")
+        console.print(
+            f"[dim]Found {len(alias_roles)} alias(es) and {len(azure_roles)} Azure role(s)[/dim]\n"
+        )
 
         # Create table with portal-style columns
         table = Table(show_header=True, header_style="bold magenta")
@@ -137,20 +139,22 @@ def list_roles(
         for idx, role in enumerate(roles, start=1):
             # Format role name with marker for aliases
             role_name = f"⭐ {role.name}" if role.is_alias else role.name
-            
+
             # Get resource info
-            resource_display = role.resource_name or (role.scope if full_scope else role.get_short_scope())
+            resource_display = role.resource_name or (
+                role.scope if full_scope else role.get_short_scope()
+            )
             resource_type_display = role.resource_type or "-"
             membership_display = role.membership_type or "Eligible"
             condition_display = role.condition if role.condition else "-"
             end_time_display = role.end_time if role.end_time else "-"
-            
+
             # Action column - show alias name for aliases (escape brackets to prevent Rich markup interpretation)
             if role.is_alias and role.alias_name:
                 action_display = escape(f"[{role.alias_name}]")
             else:
                 action_display = "Activate"
-            
+
             table.add_row(
                 str(idx),
                 role_name,
@@ -282,13 +286,12 @@ def activate_role(
     """Activate a role."""
     try:
         from az_pim_cli.models import alias_to_normalized_role
-        
+
         auth = AzureAuth()
         client = PIMClient(auth, verbose=verbose)
         config = Config()
-        
+
         role_id = None
-        is_alias_activation = False
 
         # Check if role is a number reference (e.g., "#1" or "1")
         if role.startswith("#") or role.isdigit():
@@ -321,7 +324,7 @@ def activate_role(
                 roles_data = client.list_role_assignments()
 
             azure_roles = normalize_roles(roles_data, source=RoleSource.ARM)
-            
+
             # Combine alias roles and Azure roles (same order as list command)
             all_roles = alias_roles + azure_roles
 
@@ -332,31 +335,29 @@ def activate_role(
                 raise typer.Exit(1)
 
             selected_role = all_roles[role_num - 1]
-            
+
             # If the selected role is an alias, use the alias activation path
             if selected_role.is_alias:
                 role = selected_role.alias_name or role
-                is_alias_activation = True
             else:
                 role_id = selected_role.id
                 console.print(f"[green]Selected:[/green] {selected_role.name}")
-        
+
         # Check if role is an alias
         if not role_id and config.get_alias(role):
-            is_alias_activation = True
             alias = config.get_alias(role)
             console.print(f"[blue]Using alias '[bold]{role}[/bold]'[/blue]")
-            
+
             # Get role from alias, prompt if missing
             role_id = alias.get("role")
             if not role_id:
                 console.print("[yellow]Alias is missing 'role' field.[/yellow]")
                 role_id = typer.prompt("Enter role name or ID")
-            
+
             # Merge alias defaults with command-line overrides
             duration = duration or parse_duration_from_alias(alias.get("duration"))
             justification = justification or alias.get("justification")
-            
+
             # Handle scope from alias
             if "scope" in alias:
                 alias_scope = alias.get("scope")
@@ -365,16 +366,20 @@ def activate_role(
                     subscription = alias.get("subscription")
                     if not subscription:
                         # Prompt for subscription if missing
-                        subscription = typer.prompt("Enter subscription ID", default=auth.get_subscription_id())
+                        subscription = typer.prompt(
+                            "Enter subscription ID", default=auth.get_subscription_id()
+                        )
                     scope = scope or f"subscriptions/{subscription}"
                     if alias.get("resource_group"):
                         scope = scope or f"{scope}/resourceGroups/{alias['resource_group']}"
                 elif alias_scope == "directory":
                     scope = scope or "/"
-            
+
             # Prompt for scope if still missing and resource flag is set
             if resource and not scope:
-                console.print("[yellow]Resource scope is required for resource role activation.[/yellow]")
+                console.print(
+                    "[yellow]Resource scope is required for resource role activation.[/yellow]"
+                )
                 default_sub = auth.get_subscription_id()
                 scope = typer.prompt("Enter scope", default=f"subscriptions/{default_sub}")
         elif not role_id:
@@ -651,18 +656,18 @@ def view_config() -> None:
     """Open the config file in the system editor."""
     import subprocess
     import platform
-    
+
     try:
         config = Config()
         config_path = config.get_config_path()
-        
+
         # Ensure config file exists
         if not config_path.exists():
             config.save()
-        
+
         # Get editor from environment or use platform defaults
         editor = os.environ.get("EDITOR")
-        
+
         if not editor:
             system = platform.system()
             if system == "Windows":
@@ -671,14 +676,14 @@ def view_config() -> None:
                 editor = "open"
             else:  # Linux and others
                 editor = "nano"
-        
+
         console.print(f"[blue]Opening config file in {editor}...[/blue]")
         console.print(f"[dim]Config path: {config_path}[/dim]\n")
-        
+
         subprocess.run([editor, str(config_path)], check=True)
-        
+
         console.print("[green]✓ Config file closed.[/green]")
-        
+
     except subprocess.CalledProcessError as e:
         console.print(f"[bold red]Error:[/bold red] Failed to open editor: {str(e)}")
         raise typer.Exit(1)
@@ -693,45 +698,81 @@ def edit_alias(name: str = typer.Argument(..., help="Alias name to edit")) -> No
     try:
         config = Config()
         alias = config.get_alias(name)
-        
+
         if not alias:
             console.print(f"[yellow]Alias '[bold]{name}[/bold]' not found.[/yellow]")
             create_new = typer.confirm("Would you like to create it?")
             if not create_new:
                 raise typer.Exit(0)
             alias = {}
-        
+
         console.print(f"\n[bold blue]Editing alias '[bold]{name}[/bold]'[/bold blue]")
         console.print("[dim]Press Enter to keep current value, or enter new value[/dim]\n")
-        
+
         # Edit each field interactively
         current_role = alias.get("role", "")
-        role = typer.prompt("Role name or ID", default=current_role) if current_role else typer.prompt("Role name or ID", default="")
-        
+        role = (
+            typer.prompt("Role name or ID", default=current_role)
+            if current_role
+            else typer.prompt("Role name or ID", default="")
+        )
+
         current_duration = alias.get("duration", "")
-        duration = typer.prompt("Duration (e.g., PT8H)", default=current_duration) if current_duration else typer.prompt("Duration (e.g., PT8H)", default="")
-        
+        duration = (
+            typer.prompt("Duration (e.g., PT8H)", default=current_duration)
+            if current_duration
+            else typer.prompt("Duration (e.g., PT8H)", default="")
+        )
+
         current_justification = alias.get("justification", "")
-        justification = typer.prompt("Justification", default=current_justification) if current_justification else typer.prompt("Justification", default="")
-        
+        justification = (
+            typer.prompt("Justification", default=current_justification)
+            if current_justification
+            else typer.prompt("Justification", default="")
+        )
+
         current_scope = alias.get("scope", "")
-        scope = typer.prompt("Scope (directory/subscription/resource)", default=current_scope) if current_scope else typer.prompt("Scope (directory/subscription/resource)", default="")
-        
+        scope = (
+            typer.prompt("Scope (directory/subscription/resource)", default=current_scope)
+            if current_scope
+            else typer.prompt("Scope (directory/subscription/resource)", default="")
+        )
+
         current_subscription = alias.get("subscription", "")
-        subscription = typer.prompt("Subscription ID (optional)", default=current_subscription) if current_subscription else typer.prompt("Subscription ID (optional)", default="")
-        
+        subscription = (
+            typer.prompt("Subscription ID (optional)", default=current_subscription)
+            if current_subscription
+            else typer.prompt("Subscription ID (optional)", default="")
+        )
+
         current_resource = alias.get("resource", "")
-        resource = typer.prompt("Resource name (optional)", default=current_resource) if current_resource else typer.prompt("Resource name (optional)", default="")
-        
+        resource = (
+            typer.prompt("Resource name (optional)", default=current_resource)
+            if current_resource
+            else typer.prompt("Resource name (optional)", default="")
+        )
+
         current_resource_type = alias.get("resource_type", "")
-        resource_type = typer.prompt("Resource type (optional)", default=current_resource_type) if current_resource_type else typer.prompt("Resource type (optional)", default="")
-        
+        resource_type = (
+            typer.prompt("Resource type (optional)", default=current_resource_type)
+            if current_resource_type
+            else typer.prompt("Resource type (optional)", default="")
+        )
+
         current_membership = alias.get("membership", "")
-        membership = typer.prompt("Membership type (optional)", default=current_membership) if current_membership else typer.prompt("Membership type (optional)", default="")
-        
+        membership = (
+            typer.prompt("Membership type (optional)", default=current_membership)
+            if current_membership
+            else typer.prompt("Membership type (optional)", default="")
+        )
+
         current_condition = alias.get("condition", "")
-        condition = typer.prompt("Condition (optional)", default=current_condition) if current_condition else typer.prompt("Condition (optional)", default="")
-        
+        condition = (
+            typer.prompt("Condition (optional)", default=current_condition)
+            if current_condition
+            else typer.prompt("Condition (optional)", default="")
+        )
+
         # Save the alias
         config.add_alias(
             name=name,
@@ -745,9 +786,11 @@ def edit_alias(name: str = typer.Argument(..., help="Alias name to edit")) -> No
             membership=membership or None,
             condition=condition or None,
         )
-        
-        console.print(f"\n[bold green]✓ Alias '[bold]{name}[/bold]' saved successfully![/bold green]")
-        
+
+        console.print(
+            f"\n[bold green]✓ Alias '[bold]{name}[/bold]' saved successfully![/bold green]"
+        )
+
     except (EOFError, KeyboardInterrupt):
         console.print("\n[yellow]Edit cancelled.[/yellow]")
         raise typer.Exit(0)
