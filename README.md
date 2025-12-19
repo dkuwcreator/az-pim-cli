@@ -48,6 +48,9 @@ az-pim list --resource
 
 # List resource roles for specific scope
 az-pim list --resource --scope "subscriptions/{subscription-id}"
+
+# Interactive mode: select and activate a role
+az-pim list --select
 ```
 
 ### Activate a Role
@@ -61,6 +64,11 @@ az-pim activate "{role-id}" --resource --scope "subscriptions/{sub-id}" --durati
 
 # Activate with ticket information
 az-pim activate "Security Admin" --duration 2 --ticket "INC123456" --ticket-system "ServiceNow"
+
+# Activate by role number (from list output)
+az-pim activate 1 --duration 4 --justification "Quick activation"
+# or with # prefix
+az-pim activate "#2" --duration 2 --justification "Emergency access"
 ```
 
 ### View Activation History
@@ -256,6 +264,31 @@ az-pim list
 
 # Full scope: "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-resource-group"
 az-pim list --full-scope
+```
+
+#### Interactive Selection
+
+Use interactive mode to select and activate roles:
+
+```bash
+# List roles and select interactively
+az-pim list --select
+
+# For resource roles
+az-pim list --resource --select
+```
+
+#### Quick Activation by Number
+
+All listed roles are numbered for easy reference:
+
+```bash
+# List roles to see numbers
+az-pim list
+
+# Activate by number instead of copying the full role ID
+az-pim activate 1 --duration 4 --justification "Quick access"
+az-pim activate "#2" --duration 2 --justification "Emergency access"
 ```
 
 ## Troubleshooting

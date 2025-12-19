@@ -71,6 +71,9 @@ def list_roles(
     ),
     limit: Optional[int] = typer.Option(None, "--limit", "-l", help="Limit number of results"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
+    select: bool = typer.Option(
+        False, "--select", help="Interactive mode: select and activate a role from the list"
+    ),
 ) -> None:
     """List eligible roles."""
     try:
@@ -107,16 +110,81 @@ def list_roles(
         console.print(f"[dim]Found {len(roles)} role(s)[/dim]\n")
 
         table = Table(show_header=True, header_style="bold magenta")
+        table.add_column("#", style="bold white", justify="right")
         table.add_column("Role Name", style="cyan")
         table.add_column("Role ID", style="dim")
         table.add_column("Status", style="green")
         table.add_column("Scope", style="yellow")
 
-        for role in roles:
+        for idx, role in enumerate(roles, start=1):
             scope_display = role.scope if full_scope else role.get_short_scope()
-            table.add_row(role.name, role.id, role.status, scope_display)
+            table.add_row(str(idx), role.name, role.id, role.status, scope_display)
 
         console.print(table)
+
+        # Interactive selection mode
+        if select:
+            console.print()
+            try:
+                selection = typer.prompt(
+                    "Enter role number to activate (or press Enter to cancel)", default=""
+                )
+                if not selection:
+                    console.print("[yellow]Selection cancelled.[/yellow]")
+                    return
+
+                role_idx = int(selection) - 1
+                if role_idx < 0 or role_idx >= len(roles):
+                    console.print("[red]Invalid selection.[/red]")
+                    raise typer.Exit(1)
+
+                selected_role = roles[role_idx]
+                console.print(
+                    f"\n[bold blue]Selected:[/bold blue] {selected_role.name} ({selected_role.id})"
+                )
+
+                # Prompt for activation details
+                duration_input = typer.prompt("Duration in hours", default="8")
+                justification_input = typer.prompt(
+                    "Justification", default="Requested via az-pim-cli"
+                )
+
+                duration = float(duration_input)
+                duration_str = get_duration_string(duration)
+
+                console.print(f"\n[bold blue]Activating role:[/bold blue] {selected_role.name}")
+                console.print(f"[blue]Duration:[/blue] {duration_str}")
+                console.print(f"[blue]Justification:[/blue] {justification_input}")
+
+                if resource:
+                    if not scope:
+                        subscription_id = auth.get_subscription_id()
+                        scope = f"subscriptions/{subscription_id}"
+                    console.print(f"[blue]Scope:[/blue] {scope}\n")
+
+                    result = client.request_resource_role_activation(
+                        scope=scope,
+                        role_definition_id=selected_role.id,
+                        duration=duration_str,
+                        justification=justification_input,
+                    )
+                else:
+                    console.print()
+                    result = client.request_role_activation(
+                        role_definition_id=selected_role.id,
+                        duration=duration_str,
+                        justification=justification_input,
+                    )
+
+                console.print("[bold green]✓ Role activation requested successfully![/bold green]")
+                console.print(f"[dim]Request ID: {result.get('id', 'N/A')}[/dim]")
+
+            except ValueError:
+                console.print("[red]Invalid input. Please enter a number.[/red]")
+                raise typer.Exit(1)
+            except (EOFError, KeyboardInterrupt):
+                console.print("\n[yellow]Selection cancelled.[/yellow]")
+                raise typer.Exit(0)
 
     except AuthenticationError as e:
         console.print(f"[bold red]Authentication Error:[/bold red] {str(e)}")
@@ -154,7 +222,9 @@ def list_roles(
 
 @app.command("activate")
 def activate_role(
-    role: str = typer.Argument(..., help="Role name or ID to activate"),
+    role: str = typer.Argument(
+        ..., help="Role name, ID, alias, or #N (number from list) to activate"
+    ),
     duration: Optional[float] = typer.Option(None, "--duration", "-d", help="Duration in hours"),
     justification: Optional[str] = typer.Option(
         None, "--justification", "-j", help="Justification for activation"
@@ -173,9 +243,43 @@ def activate_role(
         client = PIMClient(auth, verbose=verbose)
         config = Config()
 
+        # Check if role is a number reference (e.g., "#1" or "1")
+        if role.startswith("#") or role.isdigit():
+            try:
+                role_num = int(role.lstrip("#"))
+            except ValueError:
+                console.print(
+                    f"[red]Invalid role number format: '{role}'. Expected a number like '1' or '#1'.[/red]"
+                )
+                raise typer.Exit(1)
+
+            console.print(f"[blue]Looking up role #{role_num} from recent list...[/blue]")
+
+            # Fetch roles - note: this fetches all roles to ensure consistent ordering
+            # with the list command. For better performance, run 'az-pim list' first
+            # to see available roles, then activate by number.
+            if resource:
+                if not scope:
+                    subscription_id = auth.get_subscription_id()
+                    scope = f"subscriptions/{subscription_id}"
+                roles_data = client.list_resource_role_assignments(scope)
+            else:
+                roles_data = client.list_role_assignments()
+
+            roles = normalize_roles(roles_data, source=RoleSource.ARM)
+
+            if role_num < 1 or role_num > len(roles):
+                console.print(
+                    f"[red]Invalid role number. Please run 'az-pim list' to see available roles (1-{len(roles)}).[/red]"
+                )
+                raise typer.Exit(1)
+
+            selected_role = roles[role_num - 1]
+            role_id = selected_role.id
+            console.print(f"[green]Selected:[/green] {selected_role.name}")
         # Check if role is an alias
-        alias = config.get_alias(role)
-        if alias:
+        elif config.get_alias(role):
+            alias = config.get_alias(role)
             console.print(f"[blue]Using alias '[bold]{role}[/bold]'[/blue]")
             role_id = alias.get("role")
             duration = duration or parse_duration_from_alias(alias.get("duration"))
