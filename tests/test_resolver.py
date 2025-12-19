@@ -1,8 +1,7 @@
 """Tests for input resolver functionality."""
 
 import time
-from typing import Any, List
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -185,9 +184,7 @@ class TestInteractiveMode:
     """Test interactive selection in TTY mode."""
 
     @patch("az_pim_cli.resolver.Prompt.ask")
-    def test_interactive_multiple_matches(
-        self, mock_prompt, resolver_tty, sample_candidates
-    ):
+    def test_interactive_multiple_matches(self, mock_prompt, resolver_tty, sample_candidates):
         """Test interactive selection with multiple matches."""
         # Simulate user selecting option 1
         mock_prompt.return_value = "1"
@@ -203,9 +200,7 @@ class TestInteractiveMode:
         mock_prompt.assert_called_once()
 
     @patch("az_pim_cli.resolver.Prompt.ask")
-    def test_interactive_user_selects_second(
-        self, mock_prompt, resolver_tty, sample_candidates
-    ):
+    def test_interactive_user_selects_second(self, mock_prompt, resolver_tty, sample_candidates):
         """Test interactive selection when user picks second option."""
         mock_prompt.return_value = "2"
 
@@ -286,8 +281,8 @@ class TestResolveRole:
         """Test resolving role by name."""
         # Use dict-like objects instead of MagicMock to avoid name attribute confusion
         roles = [
-            type('Role', (), {'id': 'role-1', 'name': 'Owner'})(),
-            type('Role', (), {'id': 'role-2', 'name': 'Contributor'})(),
+            type("Role", (), {"id": "role-1", "name": "Owner"})(),
+            type("Role", (), {"id": "role-2", "name": "Contributor"})(),
         ]
 
         def fetch_fn():
@@ -307,8 +302,8 @@ class TestResolveRole:
     def test_resolve_role_by_number(self, resolver_non_tty):
         """Test resolving role by number."""
         roles = [
-            type('Role', (), {'id': 'role-1', 'name': 'Owner'})(),
-            type('Role', (), {'id': 'role-2', 'name': 'Contributor'})(),
+            type("Role", (), {"id": "role-1", "name": "Owner"})(),
+            type("Role", (), {"id": "role-2", "name": "Contributor"})(),
         ]
 
         def fetch_fn():
@@ -328,8 +323,8 @@ class TestResolveRole:
     def test_resolve_role_by_hash_number(self, resolver_non_tty):
         """Test resolving role by #N format."""
         roles = [
-            type('Role', (), {'id': 'role-1', 'name': 'Owner'})(),
-            type('Role', (), {'id': 'role-2', 'name': 'Contributor'})(),
+            type("Role", (), {"id": "role-1", "name": "Owner"})(),
+            type("Role", (), {"id": "role-2", "name": "Contributor"})(),
         ]
 
         def fetch_fn():
@@ -347,7 +342,7 @@ class TestResolveRole:
 
     def test_resolve_role_invalid_number(self, resolver_non_tty):
         """Test resolving role with invalid number."""
-        roles = [type('Role', (), {'id': 'role-1', 'name': 'Owner'})()]
+        roles = [type("Role", (), {"id": "role-1", "name": "Owner"})()]
 
         def fetch_fn():
             return roles
@@ -364,7 +359,7 @@ class TestResolveRole:
 
     def test_resolve_role_uses_cache(self, resolver_non_tty):
         """Test that resolve_role uses caching."""
-        roles = [type('Role', (), {'id': 'role-1', 'name': 'Owner'})()]
+        roles = [type("Role", (), {"id": "role-1", "name": "Owner"})()]
         fetch_calls = []
 
         def fetch_fn():

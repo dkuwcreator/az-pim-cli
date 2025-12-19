@@ -241,9 +241,7 @@ class PIMClient:
         """
         # Prefer schedule instances + asTarget() to match Azure Portal behavior and
         # avoid requiring any Graph token/permissions for RBAC PIM.
-        url = (
-            f"{self.ARM_API_BASE}/{scope}/providers/Microsoft.Authorization/roleEligibilityScheduleInstances"
-        )
+        url = f"{self.ARM_API_BASE}/{scope}/providers/Microsoft.Authorization/roleEligibilityScheduleInstances"
         if principal_id is None:
             params = {
                 "api-version": "2020-10-01",
@@ -367,9 +365,7 @@ class PIMClient:
 
         # ARM create is modeled as a PUT on a named request resource.
         request_name = str(uuid.uuid4())
-        url = (
-            f"{self.ARM_API_BASE}/{scope}/providers/Microsoft.Authorization/roleAssignmentScheduleRequests/{request_name}"
-        )
+        url = f"{self.ARM_API_BASE}/{scope}/providers/Microsoft.Authorization/roleAssignmentScheduleRequests/{request_name}"
 
         payload = {
             "properties": {
@@ -489,9 +485,7 @@ class PIMClient:
         Returns:
             List of schedule request resources
         """
-        url = (
-            f"{self.ARM_API_BASE}/{scope}/providers/Microsoft.Authorization/roleAssignmentScheduleRequests"
-        )
+        url = f"{self.ARM_API_BASE}/{scope}/providers/Microsoft.Authorization/roleAssignmentScheduleRequests"
         params: Dict[str, Any] = {
             "api-version": "2020-10-01",
             "$filter": "asRequestor()",
