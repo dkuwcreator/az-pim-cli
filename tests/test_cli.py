@@ -57,6 +57,7 @@ def test_alias_list_shows_description_column() -> None:
 def test_activate_alias_missing_role_non_tty(monkeypatch) -> None:
     """Missing alias role errors without prompting when not a TTY."""
     import types
+
     import az_pim_cli.cli as cli
 
     class FakeConfig:
@@ -97,6 +98,7 @@ def test_activate_alias_missing_role_non_tty(monkeypatch) -> None:
 def test_activate_prompts_defaults_when_tty(monkeypatch) -> None:
     """TTY activation prompts for duration/justification and applies defaults."""
     import types
+
     import az_pim_cli.cli as cli
 
     captured = {}
@@ -161,6 +163,7 @@ def test_activate_prompts_defaults_when_tty(monkeypatch) -> None:
 def test_activate_no_role_non_tty_errors(monkeypatch) -> None:
     """Activation without a role should error in non-interactive mode."""
     import types
+
     import az_pim_cli.cli as cli
 
     class FakeConfig:
@@ -207,6 +210,7 @@ def test_activate_no_role_non_tty_errors(monkeypatch) -> None:
 def test_activate_no_role_interactive_search(monkeypatch) -> None:
     """Interactive no-arg activation searches with fuzzy support and activates."""
     import types
+
     import az_pim_cli.cli as cli
 
     captured = {}
