@@ -1,129 +1,53 @@
-"""Tests for CLI commands - split by PIM subject."""
+"""Tests for CLI commands."""
 
 from typer.testing import CliRunner
-from az_pim_cli.cli import app_resources, app_entra, app_groups
+from az_pim_cli.cli import app
 
 runner = CliRunner()
 
 
-# ============================================================================
-# Test Resources CLI (azp-res)
-# ============================================================================
-
-class TestResourcesCLI:
-    """Tests for azp-res (Azure resources) CLI."""
-
-    def test_version_command(self) -> None:
-        """Test version command."""
-        result = runner.invoke(app_resources, ["version"])
-        assert result.exit_code == 0
-        assert "azp-res" in result.stdout
-        assert "2.0.0" in result.stdout
-
-    def test_help_command(self) -> None:
-        """Test help command."""
-        result = runner.invoke(app_resources, ["--help"])
-        assert result.exit_code == 0
-        assert "azp-res" in result.stdout or "Resources" in result.stdout
-
-    def test_list_help(self) -> None:
-        """Test list help command."""
-        result = runner.invoke(app_resources, ["list", "--help"])
-        assert result.exit_code == 0
-        assert "list" in result.stdout.lower() or "eligible" in result.stdout.lower()
-
-    def test_activate_help(self) -> None:
-        """Test activate help command."""
-        result = runner.invoke(app_resources, ["activate", "--help"])
-        assert result.exit_code == 0
-        assert "activate" in result.stdout.lower() or "role" in result.stdout.lower()
+def test_version_command() -> None:
+    """Test version command."""
+    result = runner.invoke(app, ["version"])
+    assert result.exit_code == 0
+    assert "az-pim-cli" in result.stdout
+    assert "0.1.0" in result.stdout
 
 
-# ============================================================================
-# Test Entra Roles CLI (azp-entra)
-# ============================================================================
-
-class TestEntraCLI:
-    """Tests for azp-entra (Entra directory roles) CLI."""
-
-    def test_version_command(self) -> None:
-        """Test version command."""
-        result = runner.invoke(app_entra, ["version"])
-        assert result.exit_code == 0
-        assert "azp-entra" in result.stdout
-        assert "2.0.0" in result.stdout
-
-    def test_help_command(self) -> None:
-        """Test help command."""
-        result = runner.invoke(app_entra, ["--help"])
-        assert result.exit_code == 0
-        assert "azp-entra" in result.stdout or "Entra" in result.stdout
-
-    def test_list_help(self) -> None:
-        """Test list help command."""
-        result = runner.invoke(app_entra, ["list", "--help"])
-        assert result.exit_code == 0
-        assert "list" in result.stdout.lower() or "eligible" in result.stdout.lower()
-
-    def test_activate_help(self) -> None:
-        """Test activate help command."""
-        result = runner.invoke(app_entra, ["activate", "--help"])
-        assert result.exit_code == 0
-        assert "activate" in result.stdout.lower() or "role" in result.stdout.lower()
-
-    def test_history_help(self) -> None:
-        """Test history help command."""
-        result = runner.invoke(app_entra, ["history", "--help"])
-        assert result.exit_code == 0
-        assert "history" in result.stdout.lower()
-
-    def test_approve_help(self) -> None:
-        """Test approve help command."""
-        result = runner.invoke(app_entra, ["approve", "--help"])
-        assert result.exit_code == 0
-        assert "approve" in result.stdout.lower()
-
-    def test_pending_help(self) -> None:
-        """Test pending help command."""
-        result = runner.invoke(app_entra, ["pending", "--help"])
-        assert result.exit_code == 0
-        assert "pending" in result.stdout.lower()
+def test_alias_list_command() -> None:
+    """Test alias list command."""
+    result = runner.invoke(app, ["alias", "list"])
+    # Should succeed even with no aliases
+    assert result.exit_code == 0
 
 
-# ============================================================================
-# Test Groups CLI (azp-groups)
-# ============================================================================
+def test_help_command() -> None:
+    """Test help command."""
+    result = runner.invoke(app, ["--help"])
+    assert result.exit_code == 0
+    assert "Azure PIM CLI" in result.stdout
 
-class TestGroupsCLI:
-    """Tests for azp-groups (Entra group memberships) CLI."""
 
-    def test_version_command(self) -> None:
-        """Test version command."""
-        result = runner.invoke(app_groups, ["version"])
-        assert result.exit_code == 0
-        assert "azp-groups" in result.stdout
-        assert "2.0.0" in result.stdout
+def test_list_help_shows_select_option() -> None:
+    """Test that list help shows the --select option."""
+    result = runner.invoke(app, ["list", "--help"])
+    assert result.exit_code == 0
+    # Check without colors (strip ANSI codes)
+    assert "select" in result.stdout.lower()
+    assert "interactive" in result.stdout.lower() or "activate a role" in result.stdout.lower()
 
-    def test_help_command(self) -> None:
-        """Test help command."""
-        result = runner.invoke(app_groups, ["--help"])
-        assert result.exit_code == 0
-        assert "azp-groups" in result.stdout or "Groups" in result.stdout
 
-    def test_list_help(self) -> None:
-        """Test list help command."""
-        result = runner.invoke(app_groups, ["list", "--help"])
-        assert result.exit_code == 0
-        assert "list" in result.stdout.lower() or "eligible" in result.stdout.lower()
+def test_activate_help_shows_number_format() -> None:
+    """Test that activate help shows role number format."""
+    result = runner.invoke(app, ["activate", "--help"])
+    assert result.exit_code == 0
+    assert "number from list" in result.stdout.lower() or "#n" in result.stdout.lower()
 
-    def test_activate_help(self) -> None:
-        """Test activate help command."""
-        result = runner.invoke(app_groups, ["activate", "--help"])
-        assert result.exit_code == 0
-        assert "activate" in result.stdout.lower() or "group" in result.stdout.lower()
 
-    def test_activate_access_option(self) -> None:
-        """Test that activate shows access option."""
-        result = runner.invoke(app_groups, ["activate", "--help"])
-        assert result.exit_code == 0
-        assert "access" in result.stdout.lower()
+def test_alias_list_shows_description_column() -> None:
+    """Test that alias list command shows description column."""
+    result = runner.invoke(app, ["alias", "list"])
+    assert result.exit_code == 0
+    # Check that the Description column is present in the output
+    # (should appear even if no aliases are configured)
+    assert "Description" in result.stdout or "No aliases configured" in result.stdout
