@@ -26,6 +26,13 @@ class NormalizedRole:
         scope: str = "",
         source: RoleSource = RoleSource.ARM,
         raw_data: Optional[Dict[str, Any]] = None,
+        resource_name: Optional[str] = None,
+        resource_type: Optional[str] = None,
+        membership_type: Optional[str] = None,
+        condition: Optional[str] = None,
+        end_time: Optional[str] = None,
+        is_alias: bool = False,
+        alias_name: Optional[str] = None,
     ):
         self.name = name
         self.id = id
@@ -33,6 +40,13 @@ class NormalizedRole:
         self.scope = scope
         self.source = source
         self.raw_data = raw_data or {}
+        self.resource_name = resource_name
+        self.resource_type = resource_type
+        self.membership_type = membership_type
+        self.condition = condition
+        self.end_time = end_time
+        self.is_alias = is_alias
+        self.alias_name = alias_name
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -75,6 +89,9 @@ def normalize_arm_role(arm_response: Dict[str, Any]) -> NormalizedRole:
             "principalId": "...",
             "scope": "...",
             "status": "...",
+            "memberType": "...",
+            "condition": "...",
+            "endDateTime": "...",
             "expandedProperties": {
                 "roleDefinition": {
                     "displayName": "...",
@@ -98,6 +115,13 @@ def normalize_arm_role(arm_response: Dict[str, Any]) -> NormalizedRole:
     role_id = props.get("roleDefinitionId", "")
     status = props.get("status", "Active")
     scope = props.get("scope", scope_info.get("id", ""))
+    
+    # Extract portal-equivalent fields
+    resource_name = scope_info.get("displayName")
+    resource_type = scope_info.get("type")
+    membership_type = props.get("memberType")
+    condition = props.get("condition")
+    end_time = props.get("endDateTime")
 
     return NormalizedRole(
         name=name,
@@ -106,6 +130,11 @@ def normalize_arm_role(arm_response: Dict[str, Any]) -> NormalizedRole:
         scope=scope,
         source=RoleSource.ARM,
         raw_data=arm_response,
+        resource_name=resource_name,
+        resource_type=resource_type,
+        membership_type=membership_type,
+        condition=condition,
+        end_time=end_time,
     )
 
 
@@ -160,3 +189,62 @@ def normalize_roles(
         return [normalize_arm_role(r) for r in responses]
     else:
         return [normalize_graph_role(r) for r in responses]
+
+
+def alias_to_normalized_role(alias_name: str, alias_config: Dict[str, Any]) -> NormalizedRole:
+    """
+    Convert an alias configuration to a NormalizedRole object.
+
+    Args:
+        alias_name: Name of the alias
+        alias_config: Alias configuration dictionary
+
+    Returns:
+        NormalizedRole object representing the alias
+    """
+    role_name = alias_config.get("role", alias_name)
+    role_id = alias_config.get("role", "")
+    
+    # For display purposes, show as "Eligible" for aliases
+    status = "Eligible"
+    
+    # Build scope from alias config
+    scope = ""
+    if alias_config.get("scope") == "subscription":
+        subscription = alias_config.get("subscription", "")
+        if subscription:
+            scope = f"subscriptions/{subscription}"
+            if alias_config.get("resource_group"):
+                scope += f"/resourceGroups/{alias_config['resource_group']}"
+    elif alias_config.get("scope") == "directory":
+        scope = "/"
+    
+    # Extract other fields
+    resource_name = alias_config.get("resource")
+    resource_type = alias_config.get("resource_type")
+    membership_type = alias_config.get("membership")
+    condition = alias_config.get("condition")
+    
+    # Convert duration to end_time format for display
+    end_time = None
+    if alias_config.get("duration"):
+        duration_str = alias_config["duration"]
+        # Extract hours from PT format
+        if duration_str.startswith("PT") and "H" in duration_str:
+            hours = duration_str.replace("PT", "").replace("H", "")
+            end_time = f"Duration: {hours}h"
+    
+    return NormalizedRole(
+        name=role_name,
+        id=role_id,
+        status=status,
+        scope=scope,
+        source=RoleSource.ARM,
+        resource_name=resource_name,
+        resource_type=resource_type,
+        membership_type=membership_type,
+        condition=condition,
+        end_time=end_time,
+        is_alias=True,
+        alias_name=alias_name,
+    )

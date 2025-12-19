@@ -85,29 +85,39 @@ class Config:
     def add_alias(
         self,
         name: str,
-        role: str,
+        role: Optional[str] = None,
         duration: Optional[str] = None,
         justification: Optional[str] = None,
         scope: Optional[str] = None,
         subscription: Optional[str] = None,
         resource_group: Optional[str] = None,
+        resource: Optional[str] = None,
+        resource_type: Optional[str] = None,
+        membership: Optional[str] = None,
+        condition: Optional[str] = None,
     ) -> None:
         """
         Add or update an alias.
 
         Args:
             name: Alias name
-            role: Role name or ID
-            duration: Duration string
-            justification: Justification text
-            scope: Scope (directory, subscription, resource)
-            subscription: Subscription ID (for resource roles)
-            resource_group: Resource group name (for resource roles)
+            role: Role name or ID (optional)
+            duration: Duration string (optional)
+            justification: Justification text (optional)
+            scope: Scope (directory, subscription, resource) (optional)
+            subscription: Subscription ID (for resource roles) (optional)
+            resource_group: Resource group name (for resource roles) (optional)
+            resource: Resource name (optional)
+            resource_type: Resource type (optional)
+            membership: Membership type (optional)
+            condition: Condition expression (optional)
         """
         if "aliases" not in self._config:
             self._config["aliases"] = {}
 
-        alias_config = {"role": role}
+        alias_config: Dict[str, Any] = {}
+        if role:
+            alias_config["role"] = role
         if duration:
             alias_config["duration"] = duration
         if justification:
@@ -118,6 +128,14 @@ class Config:
             alias_config["subscription"] = subscription
         if resource_group:
             alias_config["resource_group"] = resource_group
+        if resource:
+            alias_config["resource"] = resource
+        if resource_type:
+            alias_config["resource_type"] = resource_type
+        if membership:
+            alias_config["membership"] = membership
+        if condition:
+            alias_config["condition"] = condition
 
         self._config["aliases"][name] = alias_config
         self.save()
@@ -158,3 +176,12 @@ class Config:
             Configuration value or None
         """
         return self._config.get("defaults", {}).get(key)
+
+    def get_config_path(self) -> Path:
+        """
+        Get the configuration file path.
+
+        Returns:
+            Path to the configuration file
+        """
+        return self.config_path

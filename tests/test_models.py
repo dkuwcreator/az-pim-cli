@@ -6,6 +6,7 @@ from az_pim_cli.models import (
     normalize_roles,
     RoleSource,
     NormalizedRole,
+    alias_to_normalized_role,
 )
 
 
@@ -39,6 +40,8 @@ def test_normalize_arm_role():
     assert normalized.status == "Active"
     assert normalized.scope == "/subscriptions/sub-789"
     assert normalized.source == RoleSource.ARM
+    assert normalized.resource_name == "Test Subscription"
+    assert normalized.resource_type == "subscription"
 
 
 def test_normalize_graph_role():
@@ -161,3 +164,82 @@ def test_normalize_graph_role_with_missing_fields():
     assert normalized.id == ""
     assert normalized.status == "Provisioned"
     assert normalized.scope == "/"
+
+
+def test_normalize_arm_role_with_portal_fields():
+    """Test normalizing ARM response with all portal fields."""
+    arm_response = {
+        "id": "/providers/Microsoft.Authorization/roleEligibilityScheduleInstances/test-id",
+        "properties": {
+            "roleDefinitionId": "/providers/Microsoft.Authorization/roleDefinitions/role-123",
+            "principalId": "user-456",
+            "scope": "/subscriptions/sub-789",
+            "status": "Active",
+            "memberType": "Direct",
+            "condition": "@Resource[Microsoft.Storage/storageAccounts/blobServices/containers:name] StringEquals 'container1'",
+            "endDateTime": "2024-12-31T23:59:59Z",
+            "expandedProperties": {
+                "roleDefinition": {
+                    "displayName": "Storage Blob Data Contributor",
+                    "id": "/providers/Microsoft.Authorization/roleDefinitions/role-123",
+                },
+                "scope": {
+                    "displayName": "My Storage Account",
+                    "id": "/subscriptions/sub-789/resourceGroups/rg-test/providers/Microsoft.Storage/storageAccounts/mystore",
+                    "type": "Microsoft.Storage/storageAccounts",
+                },
+            },
+        },
+    }
+
+    normalized = normalize_arm_role(arm_response)
+
+    assert normalized.name == "Storage Blob Data Contributor"
+    assert normalized.resource_name == "My Storage Account"
+    assert normalized.resource_type == "Microsoft.Storage/storageAccounts"
+    assert normalized.membership_type == "Direct"
+    assert normalized.condition == "@Resource[Microsoft.Storage/storageAccounts/blobServices/containers:name] StringEquals 'container1'"
+    assert normalized.end_time == "2024-12-31T23:59:59Z"
+
+
+def test_alias_to_normalized_role():
+    """Test converting an alias to a NormalizedRole."""
+    alias_name = "prod-admin"
+    alias_config = {
+        "role": "Owner",
+        "duration": "PT8H",
+        "justification": "Production deployment",
+        "scope": "subscription",
+        "subscription": "12345678-1234-1234-1234-123456789abc",
+        "resource": "Production Subscription",
+        "resource_type": "subscription",
+        "membership": "Eligible",
+    }
+
+    normalized = alias_to_normalized_role(alias_name, alias_config)
+
+    assert normalized.name == "Owner"
+    assert normalized.is_alias is True
+    assert normalized.alias_name == "prod-admin"
+    assert normalized.status == "Eligible"
+    assert normalized.end_time == "Duration: 8h"
+    assert normalized.resource_name == "Production Subscription"
+    assert normalized.resource_type == "subscription"
+    assert normalized.scope == "subscriptions/12345678-1234-1234-1234-123456789abc"
+
+
+def test_alias_to_normalized_role_minimal():
+    """Test converting a minimal alias to a NormalizedRole."""
+    alias_name = "minimal-alias"
+    alias_config = {
+        "role": "Reader",
+    }
+
+    normalized = alias_to_normalized_role(alias_name, alias_config)
+
+    assert normalized.name == "Reader"
+    assert normalized.is_alias is True
+    assert normalized.alias_name == "minimal-alias"
+    assert normalized.status == "Eligible"
+    assert normalized.end_time is None
+    assert normalized.scope == ""
