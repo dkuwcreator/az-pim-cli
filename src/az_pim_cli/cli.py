@@ -145,7 +145,7 @@ def list_roles(
                 duration_display = alias_role.end_time if alias_role.end_time else "-"
                 
                 # Get description from the already-fetched alias config
-                description = alias_config.get("justification", "-")
+                description = alias_config.get("justification", "-") if alias_config else "-"
                 
                 # Format scope display
                 scope_display = alias_role.resource_name or (
