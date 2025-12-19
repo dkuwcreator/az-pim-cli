@@ -4,8 +4,8 @@ This module provides a mapping layer to normalize ARM and Graph API responses
 into a common role model, keeping UI logic stable when switching backends.
 """
 
-from typing import Any, Dict, List, Optional
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
 
 class RoleSource(Enum):

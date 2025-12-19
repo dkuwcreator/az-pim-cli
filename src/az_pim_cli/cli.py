@@ -5,19 +5,21 @@ from typing import Optional
 
 import typer
 from rich.console import Console
-from rich.table import Table
 from rich.markup import escape
+from rich.table import Table
 
 from az_pim_cli.auth import AzureAuth
-from az_pim_cli.pim_client import PIMClient
 from az_pim_cli.config import Config
-from az_pim_cli.models import normalize_roles, RoleSource
+from az_pim_cli.exceptions import (
+    AuthenticationError,
+    NetworkError,
+)
+from az_pim_cli.exceptions import PermissionError as PIMPermissionError
 from az_pim_cli.exceptions import (
     PIMError,
-    NetworkError,
-    PermissionError as PIMPermissionError,
-    AuthenticationError,
 )
+from az_pim_cli.models import RoleSource, normalize_roles
+from az_pim_cli.pim_client import PIMClient
 
 app = typer.Typer(
     name="az-pim",
@@ -654,8 +656,8 @@ def list_aliases() -> None:
 @alias_app.command("view")
 def view_config() -> None:
     """Open the config file in the system editor."""
-    import subprocess
     import platform
+    import subprocess
 
     try:
         config = Config()

@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 import requests
 
 from az_pim_cli.auth import AzureAuth, ipv4_only_context, should_use_ipv4_only
-from az_pim_cli.exceptions import NetworkError, PermissionError, ParsingError
+from az_pim_cli.exceptions import NetworkError, ParsingError, PermissionError
 
 
 class PIMClient:

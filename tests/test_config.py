@@ -1,6 +1,7 @@
 """Tests for Azure PIM CLI."""
 
 from pathlib import Path
+
 from az_pim_cli.config import Config
 
 
