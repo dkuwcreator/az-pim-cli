@@ -1,23 +1,17 @@
 # az-pim-cli v2.0
 
-A lightweight Python + Typer CLI for Azure Privileged Identity Management (PIM). **Version 2.0 introduces three focused commands** for better organization and clarity:
+A lightweight Python + Typer CLI for Azure Privileged Identity Management (PIM). Three focused commands for better organization and clarity:
 
 - **`azp-res`**: Manage Azure resource roles (ARM-scoped)
 - **`azp-entra`**: Manage Entra ID directory roles (Graph-scoped)
 - **`azp-groups`**: Manage Entra group memberships (Graph-scoped)
 
-## ⚠️ Breaking Changes in v2.0
+## Key Features
 
-The legacy `az-pim` command has been split into three focused commands. This provides:
 - **Clearer scope management**: Each command uses the appropriate OAuth scope (ARM or Graph)
 - **Better error messages**: Tailored permission hints for each PIM type
 - **Improved organization**: Commands are grouped by PIM subject
 - **Explicit scope control**: No ambiguous scope logic
-
-**Migration Guide**: Replace `az-pim` commands with the appropriate new command:
-- `az-pim list --resource` → `azp-res list`
-- `az-pim list` → `azp-entra list`
-- PIM for Groups → `azp-groups list`
 
 ## Features
 

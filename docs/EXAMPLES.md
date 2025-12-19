@@ -441,24 +441,3 @@ azp-entra activate "{role-id}" --verbose
 5. **Check history**: Review past activations for audit purposes
 6. **Verbose logging**: Use `--verbose` when troubleshooting
 7. **Limit results**: Use `--limit` when testing or exploring roles
-
-## Migration from v1.x
-
-**Before (v1.x):**
-```bash
-az-pim list                    # Listed directory roles
-az-pim list --resource         # Listed resource roles
-az-pim activate "role-name"    # Activated directory role
-```
-
-**After (v2.0):**
-```bash
-azp-entra list                 # List directory roles
-azp-res list                   # List resource roles
-azp-entra activate "{role-id}" # Activate directory role
-```
-
-The key difference is using separate commands for different PIM types, providing:
-- Clearer scope management
-- Better error messages
-- More intuitive command structure

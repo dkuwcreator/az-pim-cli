@@ -142,26 +142,6 @@ Default location: `~/.az-pim-cli/config.yml`
 
 The configuration file is created automatically on first run with example aliases.
 
-## Migration from v1.x
-
-If you have existing aliases from v1.x without prefixes, you need to add the appropriate prefix:
-
-**Before (v1.x):**
-```yaml
-aliases:
-  prod-admin:
-    role: "Owner"
-    scope: "subscription"
-```
-
-**After (v2.0):**
-```yaml
-aliases:
-  res:prod-admin:           # Add 'res:' prefix
-    role: "Owner"
-    scope: "subscriptions/{subscription-id}"
-```
-
 ## Examples
 
 ### Example 1: Production Access
