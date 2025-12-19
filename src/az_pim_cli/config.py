@@ -1,9 +1,6 @@
 """Configuration management for Azure PIM CLI.
 
-DEPRECATION NOTICE:
-    This module provides backward compatibility. New code should use
-    az_pim_cli.infra.config_adapter.EnhancedConfig for better type safety
-    and validation via Pydantic.
+This module provides configuration management for aliases and defaults.
 
 Environment Variables:
     AZ_PIM_IPV4_ONLY: Set to '1', 'true', or 'yes' to force IPv4-only DNS resolution.

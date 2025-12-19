@@ -426,26 +426,24 @@ If you encounter response parsing errors, this may indicate:
 
 ### Project Architecture
 
-The project follows a clean architecture pattern with clear separation of concerns:
+The project follows a simple, focused structure:
 
 ```
 src/az_pim_cli/
 ├── domain/          # Pure business logic (models, exceptions)
-├── app/             # Application services and use cases
-├── infra/           # Infrastructure adapters (HTTP, config, auth)
-├── interfaces/      # Protocol definitions (ports)
-├── cli.py           # CLI entry point
+├── cli.py           # CLI entry point (Typer-based)
 ├── pim_client.py    # PIM API client
 ├── resolver.py      # Input resolution logic
 ├── auth.py          # Authentication
-└── config.py        # Configuration (backward compatibility)
+├── config.py        # Configuration management
+├── models.py        # Backward compatibility re-exports
+└── exceptions.py    # Backward compatibility re-exports
 ```
 
 **Key Design Principles:**
 - **Domain Layer**: Contains pure business logic with no external dependencies
-- **Infrastructure Layer**: Adapters for external services (HTTP, file system, cloud APIs)
-- **Interfaces**: Protocol definitions allowing swappable implementations
-- **Backward Compatibility**: Original modules re-export from new locations
+- **Simple Structure**: Direct, easy-to-navigate code organization
+- **Backward Compatibility**: Original modules re-export from domain layer for stability
 
 ### Setup Development Environment
 
