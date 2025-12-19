@@ -1,6 +1,7 @@
 """Tests for CLI commands."""
 
 from typer.testing import CliRunner
+
 from az_pim_cli.cli import app
 
 runner = CliRunner()

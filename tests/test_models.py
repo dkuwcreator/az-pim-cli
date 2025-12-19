@@ -1,12 +1,12 @@
 """Tests for response normalization."""
 
 from az_pim_cli.models import (
+    NormalizedRole,
+    RoleSource,
+    alias_to_normalized_role,
     normalize_arm_role,
     normalize_graph_role,
     normalize_roles,
-    RoleSource,
-    NormalizedRole,
-    alias_to_normalized_role,
 )
 
 
@@ -198,7 +198,10 @@ def test_normalize_arm_role_with_portal_fields():
     assert normalized.resource_name == "My Storage Account"
     assert normalized.resource_type == "Microsoft.Storage/storageAccounts"
     assert normalized.membership_type == "Direct"
-    assert normalized.condition == "@Resource[Microsoft.Storage/storageAccounts/blobServices/containers:name] StringEquals 'container1'"
+    assert (
+        normalized.condition
+        == "@Resource[Microsoft.Storage/storageAccounts/blobServices/containers:name] StringEquals 'container1'"
+    )
     assert normalized.end_time == "2024-12-31T23:59:59Z"
 
 

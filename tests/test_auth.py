@@ -2,8 +2,9 @@
 
 import os
 import socket
-from unittest.mock import patch, MagicMock
-from az_pim_cli.auth import should_use_ipv4_only, ipv4_only_context, AzureAuth
+from unittest.mock import MagicMock, patch
+
+from az_pim_cli.auth import AzureAuth, ipv4_only_context, should_use_ipv4_only
 
 
 def test_should_use_ipv4_only_default():
@@ -118,8 +119,8 @@ def test_extract_token_claim_from_jwt():
     # Create a mock token with JWT structure
     # JWT format: header.payload.signature
     # Payload: {"oid": "user-123", "tid": "tenant-456"}
-    import json
     import base64
+    import json
 
     payload = {"oid": "user-123", "tid": "tenant-456"}
     payload_json = json.dumps(payload).encode()
@@ -138,8 +139,8 @@ def test_extract_token_claim_from_jwt():
 
 def test_extract_token_claim_missing_claim():
     """Test extracting a claim that doesn't exist."""
-    import json
     import base64
+    import json
 
     payload = {"oid": "user-123"}
     payload_json = json.dumps(payload).encode()
@@ -154,8 +155,8 @@ def test_extract_token_claim_missing_claim():
 
 def test_get_user_object_id_from_token():
     """Test getting user object ID from token."""
-    import json
     import base64
+    import json
 
     payload = {"oid": "user-object-123"}
     payload_json = json.dumps(payload).encode()
@@ -170,8 +171,8 @@ def test_get_user_object_id_from_token():
 
 def test_get_tenant_id_from_token():
     """Test getting tenant ID from token."""
-    import json
     import base64
+    import json
 
     payload = {"tid": "tenant-456"}
     payload_json = json.dumps(payload).encode()

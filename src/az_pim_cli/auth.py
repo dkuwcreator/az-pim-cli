@@ -7,8 +7,7 @@ import socket
 from contextlib import contextmanager
 from typing import Optional
 
-from azure.identity import DefaultAzureCredential, AzureCliCredential
-
+from azure.identity import AzureCliCredential, DefaultAzureCredential
 
 # Store original getaddrinfo for selective IPv4 forcing
 _original_getaddrinfo = socket.getaddrinfo
