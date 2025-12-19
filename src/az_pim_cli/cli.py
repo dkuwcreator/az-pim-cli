@@ -1206,12 +1206,8 @@ def add_alias(
     name: str = typer.Argument(..., help="Alias name"),
     role: str | None = typer.Argument(None, help="Role name or ID"),
     duration: str | None = typer.Option(None, "--duration", "-d", help="Duration (e.g., PT8H)"),
-    justification: str | None = typer.Option(
-        None, "--justification", "-j", help="Justification"
-    ),
-    scope: str | None = typer.Option(
-        None, "--scope", "-s", help="Scope (directory, subscription)"
-    ),
+    justification: str | None = typer.Option(None, "--justification", "-j", help="Justification"),
+    scope: str | None = typer.Option(None, "--scope", "-s", help="Scope (directory, subscription)"),
     subscription: str | None = typer.Option(None, "--subscription", help="Subscription ID"),
     resource: str | None = typer.Option(None, "--resource", help="Resource name"),
     resource_type: str | None = typer.Option(None, "--resource-type", help="Resource type"),
