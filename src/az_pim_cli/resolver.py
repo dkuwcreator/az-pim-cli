@@ -124,9 +124,7 @@ class InputResolver:
             return match.item
 
         # Multiple matches - handle based on TTY mode
-        return self._handle_multiple_matches(
-            matches, user_input, context, allow_interactive
-        )
+        return self._handle_multiple_matches(matches, user_input, context, allow_interactive)
 
     def _find_matches(
         self,
@@ -266,9 +264,7 @@ class InputResolver:
             MatchStrategy.FUZZY: f"fuzzy match (score: {match.score:.0%})",
         }
         msg = strategy_msg.get(match.strategy, "match")
-        self.console.print(
-            f"[dim]Using {context} '{match.name}' ({msg})[/dim]", style="dim"
-        )
+        self.console.print(f"[dim]Using {context} '{match.name}' ({msg})[/dim]", style="dim")
 
     def _show_no_match_error(
         self,
@@ -287,9 +283,7 @@ class InputResolver:
             for i, name in enumerate(suggestions, 1):
                 self.console.print(f"  [cyan]{i}.[/cyan] {name}")
 
-        self.console.print(
-            f"\n[dim]Tip: Run 'az-pim list' to see all available {context}s[/dim]"
-        )
+        self.console.print(f"\n[dim]Tip: Run 'az-pim list' to see all available {context}s[/dim]")
 
     def _show_multiple_matches_error(
         self,
@@ -299,8 +293,7 @@ class InputResolver:
     ) -> None:
         """Show error for multiple matches in non-interactive mode."""
         self.console.print(
-            f"[red]✗[/red] Multiple {context}s match '{user_input}' "
-            f"(non-interactive mode)"
+            f"[red]✗[/red] Multiple {context}s match '{user_input}' " f"(non-interactive mode)"
         )
         self.console.print("\n[yellow]Matching candidates:[/yellow]")
         for match in matches[:5]:  # Show top 5
@@ -309,9 +302,7 @@ class InputResolver:
         if len(matches) > 5:
             self.console.print(f"  [dim]...and {len(matches) - 5} more[/dim]")
 
-        self.console.print(
-            "\n[dim]Tip: Use exact name/ID or run in interactive mode[/dim]"
-        )
+        self.console.print("\n[dim]Tip: Use exact name/ID or run in interactive mode[/dim]")
 
     def _show_error(self, message: str) -> None:
         """Show error message."""
@@ -481,8 +472,7 @@ def resolve_role(
             return roles[role_number - 1]
         else:
             resolver.console.print(
-                f"[red]✗[/red] Invalid role number {role_number} "
-                f"(must be 1-{len(roles)})"
+                f"[red]✗[/red] Invalid role number {role_number} " f"(must be 1-{len(roles)})"
             )
             return None
 

@@ -6,7 +6,6 @@ from typing import Any, Optional
 
 import typer
 from rich.console import Console
-from rich.markup import escape
 from rich.table import Table
 
 from az_pim_cli.auth import AzureAuth
@@ -59,92 +58,94 @@ def get_resolver(config: Config, is_tty: Optional[bool] = None) -> InputResolver
 
 
 def resolve_scope_input(
-    scope_input: str, 
-    auth: AzureAuth, 
-    client: Optional[Any] = None,
-    config: Optional[Config] = None
+    scope_input: str, auth: AzureAuth, client: Optional[Any] = None, config: Optional[Config] = None
 ) -> str:
     """
     Resolve user-provided scope input to a full Azure scope path.
     Supports subscriptions, management groups, and resource groups.
-    
+
     Args:
         scope_input: User-provided scope (name, partial path, etc.)
         auth: AzureAuth instance for getting subscription context
         client: Optional PIMClient for fetching available scopes
         config: Optional Config for resolver settings
-    
+
     Returns:
         Full scope path
     """
     # If already a full path, return as-is (ensure leading slash)
     if scope_input.startswith("/subscriptions/") or scope_input.startswith("/providers/"):
         return scope_input
-    
+
     if scope_input.startswith("subscriptions/"):
         return f"/{scope_input}"
-    
+
     # If it contains "subscriptions/" somewhere, try to extract and normalize
     if "subscriptions/" in scope_input:
         # Ensure leading slash
         return f"/{scope_input}" if not scope_input.startswith("/") else scope_input
-    
+
     # Try to resolve against available scopes if client provided
     if client and config:
         try:
             resolver = get_resolver(config)
             subscription_id = auth.get_subscription_id()
-            
+
             def fetch_scopes():
                 """Fetch available scopes: management groups, subscriptions, and resource groups."""
                 scopes = []
-                
+
                 # Add current subscription
-                scopes.append({
-                    'id': f"/subscriptions/{subscription_id}",
-                    'name': subscription_id,
-                    'type': 'subscription'
-                })
-                
+                scopes.append(
+                    {
+                        "id": f"/subscriptions/{subscription_id}",
+                        "name": subscription_id,
+                        "type": "subscription",
+                    }
+                )
+
                 # Fetch eligible resource role assignments to discover scopes
                 try:
-                    roles_data = client.list_resource_role_assignments(f"subscriptions/{subscription_id}")
+                    roles_data = client.list_resource_role_assignments(
+                        f"subscriptions/{subscription_id}"
+                    )
                     # Extract unique scopes from roles
                     seen_scopes = set()
                     for role in roles_data:
-                        scope_id = role.get('properties', {}).get('expandedProperties', {}).get('scope', {}).get('id')
+                        scope_id = (
+                            role.get("properties", {})
+                            .get("expandedProperties", {})
+                            .get("scope", {})
+                            .get("id")
+                        )
                         if not scope_id:
                             continue
                         if scope_id in seen_scopes:
                             continue
                         seen_scopes.add(scope_id)
-                        
+
                         # Extract name from scope
-                        scope_name = scope_id.split('/')[-1] if '/' in scope_id else scope_id
-                        
+                        scope_name = scope_id.split("/")[-1] if "/" in scope_id else scope_id
+
                         # Determine type
-                        scope_type = 'unknown'
-                        if '/managementGroups/' in scope_id:
-                            scope_type = 'managementGroup'
-                        elif '/resourceGroups/' in scope_id:
-                            scope_type = 'resourceGroup'
-                        elif '/subscriptions/' in scope_id and scope_id.count('/') == 2:
-                            scope_type = 'subscription'
-                        
-                        scopes.append({
-                            'id': scope_id,
-                            'name': scope_name,
-                            'type': scope_type
-                        })
+                        scope_type = "unknown"
+                        if "/managementGroups/" in scope_id:
+                            scope_type = "managementGroup"
+                        elif "/resourceGroups/" in scope_id:
+                            scope_type = "resourceGroup"
+                        elif "/subscriptions/" in scope_id and scope_id.count("/") == 2:
+                            scope_type = "subscription"
+
+                        scopes.append({"id": scope_id, "name": scope_name, "type": scope_type})
                 except Exception:
                     # If we can't fetch scopes, fall back to basic resolution
                     pass
-                
+
                 return scopes
-            
+
             def extract_scope_id(scope: dict) -> str:
-                return scope.get('name', '')
-            
+                return scope.get("name", "")
+
             resolved = resolver.resolve(
                 user_input=scope_input,
                 candidates=fetch_scopes(),
@@ -152,13 +153,13 @@ def resolve_scope_input(
                 context="scope",
                 allow_interactive=True,
             )
-            
+
             if resolved:
-                return resolved['id']
+                return resolved["id"]
         except Exception:
             # Fall through to default behavior
             pass
-    
+
     # Default: treat as resource group name within current subscription
     subscription_id = auth.get_subscription_id()
     return f"/subscriptions/{subscription_id}/resourceGroups/{scope_input}"
@@ -457,7 +458,7 @@ def list_roles(
 def activate_role(
     role: Optional[str] = typer.Argument(
         None,
-        help="Role name, ID, alias, or #N (number from list) to activate. If omitted in a TTY, you'll be prompted to search and pick."
+        help="Role name, ID, alias, or #N (number from list) to activate. If omitted in a TTY, you'll be prompted to search and pick.",
     ),
     duration: Optional[float] = typer.Option(None, "--duration", "-d", help="Duration in hours"),
     justification: Optional[str] = typer.Option(
@@ -490,7 +491,7 @@ def activate_role(
         def ensure_scope(current_scope: Optional[str]) -> str:
             if current_scope:
                 return resolve_scope_input(current_scope, auth, client, config)
-            
+
             default_sub = auth.get_subscription_id()
             default_scope = f"subscriptions/{default_sub}"
             if is_interactive():
@@ -525,7 +526,12 @@ def activate_role(
                 alias_configs.append(alias_config)
             return alias_roles, alias_configs
 
-        def display_roles(alias_roles: list[Any], alias_configs: list[dict], azure_roles: list[Any], show_full_scope: bool = False) -> None:
+        def display_roles(
+            alias_roles: list[Any],
+            alias_configs: list[dict],
+            azure_roles: list[Any],
+            show_full_scope: bool = False,
+        ) -> None:
             if alias_roles:
                 console.print("[bold green]Configured Aliases[/bold green]")
                 alias_table = Table(show_header=True, header_style="bold magenta")
@@ -599,14 +605,18 @@ def activate_role(
                 console.print("[red]Role name or ID is required in non-interactive mode.[/red]")
                 raise typer.Exit(1)
 
-            console.print("[bold blue]No role provided. Fetching aliases and eligible roles...[/bold blue]")
+            console.print(
+                "[bold blue]No role provided. Fetching aliases and eligible roles...[/bold blue]"
+            )
 
             alias_roles, alias_configs = load_aliases()
 
             if resource:
                 scope = ensure_scope(scope)
                 roles_data = client.list_resource_role_assignments(scope)
-                console.print(f"\n[bold green]Eligible Resource Roles (Scope: {scope})[/bold green]")
+                console.print(
+                    f"\n[bold green]Eligible Resource Roles (Scope: {scope})[/bold green]"
+                )
             else:
                 roles_data = client.list_role_assignments()
                 console.print("\n[bold green]Eligible Azure AD Roles[/bold green]")
@@ -630,31 +640,34 @@ def activate_role(
                 "[dim]Enter a number to activate, or a name/alias to filter (fuzzy matching enabled), or press Enter to cancel.[/dim]"
             )
             selection = typer.prompt("Select", default="")
-            
+
             if not selection:
                 console.print("[yellow]Selection cancelled.[/yellow]")
                 raise typer.Exit(0)
 
             selected_role = None
-            
+
             # Check if input is a number
             try:
                 role_idx = int(selection) - 1
                 if 0 <= role_idx < len(all_roles):
                     selected_role = all_roles[role_idx]
                 else:
-                    console.print(f"[red]Invalid role number. Valid range: 1-{len(all_roles)}[/red]")
+                    console.print(
+                        f"[red]Invalid role number. Valid range: 1-{len(all_roles)}[/red]"
+                    )
                     raise typer.Exit(1)
             except ValueError:
                 # Not a number, treat as search term
                 try:
                     from rapidfuzz import fuzz
+
                     has_rapidfuzz = True
                 except ImportError:
                     has_rapidfuzz = False
 
                 fuzzy_threshold = config.get_default("fuzzy_threshold", 0.6)
-                
+
                 # Filter matches based on fuzzy matching
                 matched_roles = []
                 for idx, role in enumerate(all_roles):
@@ -663,29 +676,32 @@ def activate_role(
                         score = fuzz.ratio(selection.lower(), role_name.lower()) / 100.0
                     else:
                         import difflib
-                        score = difflib.SequenceMatcher(None, selection.lower(), role_name.lower()).ratio()
-                    
+
+                        score = difflib.SequenceMatcher(
+                            None, selection.lower(), role_name.lower()
+                        ).ratio()
+
                     if score >= fuzzy_threshold or selection.lower() in role_name.lower():
                         matched_roles.append((idx, role, score))
-                
+
                 if not matched_roles:
                     console.print(f"[yellow]No roles match '{selection}'[/yellow]")
                     raise typer.Exit(0)
-                
+
                 # Sort by score descending
                 matched_roles.sort(key=lambda x: x[2], reverse=True)
-                
+
                 console.print(f"\n[green]Found {len(matched_roles)} matching role(s)[/green]\n")
-                
+
                 # Build filtered display lists
                 filtered_alias_roles = []
                 filtered_alias_configs = []
                 filtered_azure_roles = []
                 renumbered_roles = []
-                
+
                 for orig_idx, role, score in matched_roles:
                     renumbered_roles.append(role)
-                    if getattr(role, 'is_alias', False):
+                    if getattr(role, "is_alias", False):
                         # Find the alias config by matching the role object
                         for i, ar in enumerate(alias_roles):
                             if ar is role:
@@ -694,7 +710,7 @@ def activate_role(
                                 break
                     else:
                         filtered_azure_roles.append(role)
-                
+
                 # Display filtered results with renumbering
                 if filtered_alias_roles:
                     console.print("[bold green]Matching Aliases[/bold green]")
@@ -712,7 +728,9 @@ def activate_role(
                         alias_name = alias_role.alias_name or "Unknown"
                         role_name = alias_role.name
                         duration_display = alias_role.end_time if alias_role.end_time else "-"
-                        description = alias_config.get("justification", "-") if alias_config else "-"
+                        description = (
+                            alias_config.get("justification", "-") if alias_config else "-"
+                        )
                         scope_display = alias_role.resource_name or alias_role.get_short_scope()
 
                         alias_table.add_row(
@@ -750,34 +768,36 @@ def activate_role(
                         )
 
                     console.print(roles_table)
-                
+
                 console.print()
                 num_selection = typer.prompt(
                     "Enter role number to activate (or press Enter to cancel)", default=""
                 )
-                
+
                 if not num_selection:
                     console.print("[yellow]Selection cancelled.[/yellow]")
                     raise typer.Exit(0)
-                
+
                 try:
                     filtered_idx = int(num_selection) - 1
                     if 0 <= filtered_idx < len(renumbered_roles):
                         selected_role = renumbered_roles[filtered_idx]
                     else:
-                        console.print(f"[red]Invalid selection. Valid range: 1-{len(renumbered_roles)}[/red]")
+                        console.print(
+                            f"[red]Invalid selection. Valid range: 1-{len(renumbered_roles)}[/red]"
+                        )
                         raise typer.Exit(1)
                 except ValueError:
                     console.print("[red]Invalid input. Please enter a number.[/red]")
                     raise typer.Exit(1)
-            
+
             if not selected_role:
                 console.print("[red]Invalid selection.[/red]")
                 raise typer.Exit(1)
 
             # If the selected role is an alias, delegate to alias handling; otherwise use its ID
             if getattr(selected_role, "is_alias", False):
-                role = selected_role.alias_name or search_input
+                role = selected_role.alias_name or selection
             else:
                 role_id = selected_role.id
                 role = selected_role.name
@@ -859,7 +879,9 @@ def activate_role(
                 if is_interactive():
                     role_id = typer.prompt("Enter role name or ID")
                 else:
-                    console.print("[red]Role name or ID is required when using an alias without a 'role'. Pass a role or update the alias configuration.[/red]")
+                    console.print(
+                        "[red]Role name or ID is required when using an alias without a 'role'. Pass a role or update the alias configuration.[/red]"
+                    )
                     raise typer.Exit(1)
 
             # Merge alias defaults with command-line overrides
@@ -906,11 +928,11 @@ def activate_role(
             if role_id and not looks_like_arm_role_definition_id(role_id):
                 # Resolve a display name (e.g., "Owner") to the roleDefinitionId at this scope.
                 resolver = get_resolver(config)
-                
+
                 def fetch_roles():
                     roles_data = client.list_resource_role_assignments(scope)
                     return normalize_roles(roles_data, source=RoleSource.ARM)
-                
+
                 resolved_role = resolve_role(
                     resolver=resolver,
                     role_input=role_id,
@@ -918,11 +940,13 @@ def activate_role(
                     fetch_roles_fn=fetch_roles,
                     role_name_extractor=lambda r: r.name,
                 )
-                
+
                 if not resolved_role:
-                    console.print("[yellow]Tip:[/yellow] Run 'az-pim list --resource --scope <scope>' to see all available roles.")
+                    console.print(
+                        "[yellow]Tip:[/yellow] Run 'az-pim list --resource --scope <scope>' to see all available roles."
+                    )
                     raise typer.Exit(1)
-                
+
                 role_id = resolved_role.id
 
         # Prompt for missing required inputs with defaults implied by TTY
@@ -933,7 +957,9 @@ def activate_role(
             try:
                 duration = float(dur_input)
             except ValueError:
-                console.print("[red]Invalid duration. Please enter a number of hours (e.g., 8).[/red]")
+                console.print(
+                    "[red]Invalid duration. Please enter a number of hours (e.g., 8).[/red]"
+                )
                 raise typer.Exit(1)
 
         if is_interactive() and not justification:

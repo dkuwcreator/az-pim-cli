@@ -85,7 +85,9 @@ def test_activate_alias_missing_role_non_tty(monkeypatch) -> None:
     monkeypatch.setattr(cli, "Config", FakeConfig)
     monkeypatch.setattr(cli, "AzureAuth", FakeAuth)
     monkeypatch.setattr(cli, "PIMClient", FakeClient)
-    monkeypatch.setattr(cli, "sys", types.SimpleNamespace(stdin=types.SimpleNamespace(isatty=lambda: False)))
+    monkeypatch.setattr(
+        cli, "sys", types.SimpleNamespace(stdin=types.SimpleNamespace(isatty=lambda: False))
+    )
 
     result = runner.invoke(cli.app, ["activate", "alias-missing-role"])
     assert result.exit_code != 0
@@ -144,9 +146,13 @@ def test_activate_prompts_defaults_when_tty(monkeypatch) -> None:
     monkeypatch.setattr(cli, "Config", FakeConfig)
     monkeypatch.setattr(cli, "AzureAuth", FakeAuth)
     monkeypatch.setattr(cli, "PIMClient", FakeClient)
-    monkeypatch.setattr(cli, "sys", types.SimpleNamespace(stdin=types.SimpleNamespace(isatty=lambda: True)))
+    monkeypatch.setattr(
+        cli, "sys", types.SimpleNamespace(stdin=types.SimpleNamespace(isatty=lambda: True))
+    )
 
-    result = runner.invoke(cli.app, ["activate", "62e90394-69f5-4237-9190-012177145e10"], input="\n\n")
+    result = runner.invoke(
+        cli.app, ["activate", "62e90394-69f5-4237-9190-012177145e10"], input="\n\n"
+    )
     assert result.exit_code == 0
     assert captured["payload"]["duration"] == "PT4H"
     assert captured["payload"]["justification"] == "Default just"
@@ -216,6 +222,7 @@ def test_activate_no_role_interactive_search(monkeypatch) -> None:
             self.condition = None
             self.end_time = None
             self.is_alias = False
+            self.alias_name = None
 
         def get_short_scope(self):
             return "/"
@@ -227,12 +234,19 @@ def test_activate_no_role_interactive_search(monkeypatch) -> None:
         def get_alias(self, _name: str):
             return None
 
-        def get_default(self, key: str):
+        def get_default(self, key: str, fallback=None):
             if key == "duration":
                 return "PT1H"
             if key == "justification":
                 return "Default just"
-            return None
+            # Support resolver config
+            if key == "fuzzy_matching":
+                return True
+            if key == "fuzzy_threshold":
+                return 0.8
+            if key == "cache_ttl_seconds":
+                return 300
+            return fallback if fallback is not None else None
 
         def list_aliases(self):
             return {}
@@ -268,7 +282,7 @@ def test_activate_no_role_interactive_search(monkeypatch) -> None:
             }
             return {"id": "req-xyz"}
 
-    def fake_normalize(_data, _source=None):
+    def fake_normalize(_data, source=None):
         return [FakeRole()]
 
     monkeypatch.setattr(cli, "Config", FakeConfig)
@@ -284,7 +298,7 @@ def test_activate_no_role_interactive_search(monkeypatch) -> None:
         ),
     )
 
-    result = runner.invoke(cli.app, ["activate"], input="Owner\n\n\n")
+    result = runner.invoke(cli.app, ["activate"], input="Owner\n1\n\n\n")
     assert result.exit_code == 0
     assert captured["payload"]["role_definition_id"] == "role-id"
     assert captured["payload"]["duration"] == "PT1H"
