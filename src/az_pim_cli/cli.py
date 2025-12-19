@@ -677,8 +677,9 @@ def list_aliases() -> None:
             scope = alias_config.get("scope", "directory")
             
             # Add subscription info to scope if present
-            if scope == "subscription" and alias_config.get("subscription"):
-                sub_id = alias_config["subscription"][:SUBSCRIPTION_ID_DISPLAY_LENGTH]
+            subscription_id = alias_config.get("subscription", "")
+            if scope == "subscription" and subscription_id:
+                sub_id = subscription_id[:SUBSCRIPTION_ID_DISPLAY_LENGTH]
                 scope = f"{scope} (sub:{sub_id}...)"
 
             table.add_row(alias_name, role, duration, description, scope)
