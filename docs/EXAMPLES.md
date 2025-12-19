@@ -2,6 +2,14 @@
 
 This document provides practical examples for using the Azure PIM CLI.
 
+## Table of Contents
+
+- [Basic Usage](#basic-usage)
+- [Smart Input Resolution](#smart-input-resolution)
+- [Resource Roles](#resource-roles)
+- [Aliases](#aliases)
+- [History and Approvals](#history-and-approvals)
+
 ## Basic Usage
 
 ### List Available Roles
@@ -51,7 +59,137 @@ az-pim activate 1 --duration 4 --justification "Quick access"
 az-pim activate "#3" --duration 2 --justification "Emergency access"
 ```
 
-### Prompting and Defaults
+## Smart Input Resolution
+
+The CLI intelligently matches role and scope names, making activation easier without requiring exact matches.
+
+### Role Name Matching
+
+```bash
+# Exact match
+az-pim activate "Security Administrator"
+
+# Case-insensitive match
+az-pim activate "security administrator"
+
+# Prefix match (unique)
+az-pim activate "Security"  # Matches if only one role starts with "Security"
+
+# Fuzzy match (handles typos)
+az-pim activate "Sec Admin"        # Matches "Security Administrator"
+az-pim activate "Contributer"      # Matches "Contributor" (fixes typo)
+az-pim activate "Glbl Admn"        # Matches "Global Administrator"
+
+# Partial name matching
+az-pim activate "User Admin"       # Matches "User Administrator"
+az-pim activate "Privileged Auth"  # Matches "Privileged Authentication Administrator"
+```
+
+### Interactive Multiple Matches
+
+When multiple roles match your input in TTY mode, you'll see an interactive prompt:
+
+```bash
+az-pim activate "Security"
+
+# Output:
+# Multiple roles match your input:
+#   1. Security Administrator
+#   2. Security Reader
+# Select number [1]: _
+```
+
+### Non-Interactive Mode (Scripts)
+
+In automation/scripts, the CLI requires unique matches:
+
+```bash
+# Single match: works silently
+az-pim activate "Owner"  # ✓ Only one role named "Owner"
+
+# Multiple matches: fails with error
+az-pim activate "Security"
+# ✗ Multiple roles match 'Security' (non-interactive mode)
+# Matching candidates:
+#   • Security Administrator
+#   • Security Reader
+# Tip: Use exact name/ID or run in interactive mode
+
+# No match: shows suggestions
+az-pim activate "Admin"
+# ✗ Role 'Admin' not found
+# Did you mean:
+#   1. Global Administrator
+#   2. Privileged Role Administrator
+#   3. User Administrator
+```
+
+### Scope Matching (Resource Roles)
+
+Scope names are also matched intelligently:
+
+```bash
+# By subscription/resource group name
+az-pim activate "Owner" --resource --scope "Production"
+
+# Prefix matching
+az-pim activate "Contributor" --resource --scope "prod"
+# Using scope 'Production-Subscription' (prefix match)
+
+# Case-insensitive
+az-pim activate "Reader" --resource --scope "MYRESOURCEGROUP"
+
+# Full path (exact - bypasses matching)
+az-pim activate "Owner" --resource \
+  --scope "/subscriptions/12345678-1234-1234-1234-123456789abc"
+```
+
+### Best Practices for Scripts
+
+For automation, use exact identifiers to avoid ambiguity:
+
+```bash
+# Use role definition ID (GUID)
+az-pim activate "62e90394-69f5-4237-9190-012177145e10" \
+  --duration 4 \
+  --justification "Automated deployment"
+
+# Use full scope path
+az-pim activate "Owner" \
+  --resource \
+  --scope "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/prod-rg" \
+  --duration 8 \
+  --justification "Production deployment"
+
+# Disable fuzzy matching in config for strict automation
+# ~/.az-pim-cli/config.yml:
+# defaults:
+#   fuzzy_matching: false
+```
+
+### Performance Optimization
+
+The CLI caches role lookups to minimize API calls:
+
+```bash
+# First activation fetches roles (slower)
+az-pim activate "Owner" --resource --duration 4
+
+# Subsequent activations within 5 minutes use cache (faster)
+az-pim activate "Contributor" --resource --duration 4
+az-pim activate "Reader" --resource --duration 2
+
+# Cache expires after cache_ttl_seconds (default: 300s / 5min)
+```
+
+Configure cache TTL in `~/.az-pim-cli/config.yml`:
+
+```yaml
+defaults:
+  cache_ttl_seconds: 600  # 10 minutes
+```
+
+## Resource Roles
 
 When running in a TTY, missing required inputs are prompted with sensible defaults:
 

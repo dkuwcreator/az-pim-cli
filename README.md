@@ -7,11 +7,13 @@ A lightweight Python + Typer CLI for Azure Privileged Identity Management (PIM).
 - 🔐 **Azure AD Roles**: Request and manage Azure AD (Entra ID) privileged roles
 - ☁️ **Resource Roles**: Request and manage Azure resource roles (subscriptions, resource groups)
 - ⚡ **Quick Activation**: Activate roles with simple commands
+- 🎯 **Smart Input Resolution**: Intelligent matching for role/scope names with fuzzy search support
 - 📝 **Approval Workflow**: Approve pending role requests
 - 📊 **History Tracking**: View activation history
-- 🎯 **Aliases**: Define custom aliases with preset duration, justification, and scope
+- 🏷️ **Aliases**: Define custom aliases with preset duration, justification, and scope
 - 🔑 **Flexible Auth**: Uses Azure CLI credentials or MSAL for authentication
 - 🎨 **Rich UI**: Beautiful terminal output with tables and colors
+- 💾 **Smart Caching**: Caches role lookups to minimize API calls
 
 ## Installation
 
@@ -23,10 +25,22 @@ cd az-pim-cli
 pip install -e .
 ```
 
+### Optional: Enhanced Fuzzy Matching
+
+For better performance with fuzzy name matching:
+
+```bash
+pip install az-pim-cli[fuzzy]
+```
+
+This installs `rapidfuzz` for faster and more accurate fuzzy matching.
+
 ### From PyPI (coming soon)
 
 ```bash
 pip install az-pim-cli
+# Or with fuzzy matching support
+pip install az-pim-cli[fuzzy]
 ```
 
 ## Prerequisites
@@ -102,6 +116,45 @@ az-pim activate prod-admin
 # Remove an alias
 az-pim alias remove prod-admin
 ```
+
+### Smart Input Resolution
+
+The CLI intelligently matches role and scope names, so you don't need to type exact names:
+
+```bash
+# Partial names (prefix matching)
+az-pim activate "Contrib"  # Matches "Contributor"
+az-pim activate "Sec Admin"  # Matches "Security Administrator"
+
+# Case-insensitive
+az-pim activate "owner"  # Matches "Owner"
+
+# Typo correction (fuzzy matching)
+az-pim activate "Contributer"  # Matches "Contributor"
+az-pim activate "Sec Admnistrator"  # Matches "Security Administrator"
+
+# Scope name matching
+az-pim activate "Owner" --resource --scope "Production"
+# Matches subscription or resource group named "Production"
+
+# Interactive selection with multiple matches (TTY only)
+az-pim activate "Security"
+# Shows numbered list:
+#   1. Security Administrator
+#   2. Security Reader
+# Select number [1]: _
+```
+
+Configuration in `~/.az-pim-cli/config.yml`:
+
+```yaml
+defaults:
+  fuzzy_matching: true      # Enable fuzzy matching
+  fuzzy_threshold: 0.8      # Minimum similarity (0.0-1.0)
+  cache_ttl_seconds: 300    # Cache lookups for 5 minutes
+```
+
+See [EXAMPLES.md](docs/EXAMPLES.md#smart-input-resolution) for more details.
 
 ### Approve Requests
 

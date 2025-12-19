@@ -44,6 +44,9 @@ dev = [
     "types-PyYAML>=6.0.0",
     "types-requests>=2.31.0",
 ]
+fuzzy = [
+    "rapidfuzz>=3.0.0",
+]
 
 [project.scripts]
 az-pim = "az_pim_cli.cli:app"

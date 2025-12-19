@@ -2,7 +2,7 @@
 
 import os
 import sys
-from typing import Optional
+from typing import Any, Optional
 
 import typer
 from rich.console import Console
@@ -25,6 +25,7 @@ from az_pim_cli.models import (
     normalize_roles,
 )
 from az_pim_cli.pim_client import PIMClient
+from az_pim_cli.resolver import InputResolver, resolve_role
 
 app = typer.Typer(
     name="az-pim",
@@ -33,6 +34,133 @@ app = typer.Typer(
 )
 
 console = Console()
+
+
+def get_resolver(config: Config) -> InputResolver:
+    """
+    Get a configured InputResolver instance.
+
+    Args:
+        config: Config instance
+
+    Returns:
+        InputResolver configured from settings
+    """
+    fuzzy_enabled = config.get_default("fuzzy_matching", True)
+    fuzzy_threshold = config.get_default("fuzzy_threshold", 0.8)
+    cache_ttl = config.get_default("cache_ttl_seconds", 300)
+
+    return InputResolver(
+        fuzzy_enabled=fuzzy_enabled,
+        fuzzy_threshold=fuzzy_threshold,
+        cache_ttl_seconds=cache_ttl,
+    )
+
+
+def resolve_scope_input(
+    scope_input: str, 
+    auth: AzureAuth, 
+    client: Optional[Any] = None,
+    config: Optional[Config] = None
+) -> str:
+    """
+    Resolve user-provided scope input to a full Azure scope path.
+    Supports subscriptions, management groups, and resource groups.
+    
+    Args:
+        scope_input: User-provided scope (name, partial path, etc.)
+        auth: AzureAuth instance for getting subscription context
+        client: Optional PIMClient for fetching available scopes
+        config: Optional Config for resolver settings
+    
+    Returns:
+        Full scope path
+    """
+    # If already a full path, return as-is (ensure leading slash)
+    if scope_input.startswith("/subscriptions/") or scope_input.startswith("/providers/"):
+        return scope_input
+    
+    if scope_input.startswith("subscriptions/"):
+        return f"/{scope_input}"
+    
+    # If it contains "subscriptions/" somewhere, try to extract and normalize
+    if "subscriptions/" in scope_input:
+        # Ensure leading slash
+        return f"/{scope_input}" if not scope_input.startswith("/") else scope_input
+    
+    # Try to resolve against available scopes if client provided
+    if client and config:
+        try:
+            resolver = get_resolver(config)
+            subscription_id = auth.get_subscription_id()
+            
+            def fetch_scopes():
+                """Fetch available scopes: management groups, subscriptions, and resource groups."""
+                scopes = []
+                
+                # Add current subscription
+                scopes.append({
+                    'id': f"/subscriptions/{subscription_id}",
+                    'name': subscription_id,
+                    'type': 'subscription'
+                })
+                
+                # Fetch eligible resource role assignments to discover scopes
+                try:
+                    roles_data = client.list_resource_role_assignments(f"subscriptions/{subscription_id}")
+                    # Extract unique scopes from roles
+                    seen_scopes = set()
+                    for role in roles_data:
+                        scope_id = role.get('properties', {}).get('expandedProperties', {}).get('scope', {}).get('id')
+                        if not scope_id:
+                            continue
+                        if scope_id in seen_scopes:
+                            continue
+                        seen_scopes.add(scope_id)
+                        
+                        # Extract name from scope
+                        scope_name = scope_id.split('/')[-1] if '/' in scope_id else scope_id
+                        
+                        # Determine type
+                        scope_type = 'unknown'
+                        if '/managementGroups/' in scope_id:
+                            scope_type = 'managementGroup'
+                        elif '/resourceGroups/' in scope_id:
+                            scope_type = 'resourceGroup'
+                        elif '/subscriptions/' in scope_id and scope_id.count('/') == 2:
+                            scope_type = 'subscription'
+                        
+                        scopes.append({
+                            'id': scope_id,
+                            'name': scope_name,
+                            'type': scope_type
+                        })
+                except Exception:
+                    # If we can't fetch scopes, fall back to basic resolution
+                    pass
+                
+                return scopes
+            
+            def extract_scope_id(scope: dict) -> str:
+                return scope.get('name', '')
+            
+            resolved = resolver.resolve(
+                user_input=scope_input,
+                candidates=fetch_scopes(),
+                name_extractor=extract_scope_id,
+                context="scope",
+                allow_interactive=True,
+            )
+            
+            if resolved:
+                return resolved['id']
+        except Exception:
+            # Fall through to default behavior
+            pass
+    
+    # Default: treat as resource group name within current subscription
+    subscription_id = auth.get_subscription_id()
+    return f"/subscriptions/{subscription_id}/resourceGroups/{scope_input}"
 
 
 def parse_duration_from_alias(duration_str: Optional[str]) -> Optional[float]:
@@ -98,6 +226,9 @@ def list_roles(
                 # Default to current subscription
                 subscription_id = auth.get_subscription_id()
                 scope = f"subscriptions/{subscription_id}"
+            else:
+                # Resolve scope input to full path
+                scope = resolve_scope_input(scope, auth, client, config)
 
             roles_data = client.list_resource_role_assignments(scope, limit=limit)
             console.print(f"\n[bold green]Eligible Resource Roles (Scope: {scope})[/bold green]")
@@ -356,7 +487,8 @@ def activate_role(
 
         def ensure_scope(current_scope: Optional[str]) -> str:
             if current_scope:
-                return current_scope
+                return resolve_scope_input(current_scope, auth, client, config)
+            
             default_sub = auth.get_subscription_id()
             default_scope = f"subscriptions/{default_sub}"
             if is_interactive():
@@ -496,48 +628,25 @@ def activate_role(
 
             if role_id and not looks_like_arm_role_definition_id(role_id):
                 # Resolve a display name (e.g., "Owner") to the roleDefinitionId at this scope.
-                roles_data = client.list_resource_role_assignments(scope)
-                azure_roles = normalize_roles(roles_data, source=RoleSource.ARM)
-                matches = [r for r in azure_roles if r.name.lower() == role_id.lower()]
-
-                if not matches:
-                    console.print(
-                        f"[red]Couldn't find an eligible resource role named '{escape(role_id)}' at scope '{escape(scope)}'.[/red]"
-                    )
-                    console.print("[yellow]Tip:[/yellow] Run 'az-pim list --resource --scope <scope>' and activate by number.")
+                resolver = get_resolver(config)
+                
+                def fetch_roles():
+                    roles_data = client.list_resource_role_assignments(scope)
+                    return normalize_roles(roles_data, source=RoleSource.ARM)
+                
+                resolved_role = resolve_role(
+                    resolver=resolver,
+                    role_input=role_id,
+                    scope=scope,
+                    fetch_roles_fn=fetch_roles,
+                    role_name_extractor=lambda r: r.name,
+                )
+                
+                if not resolved_role:
+                    console.print("[yellow]Tip:[/yellow] Run 'az-pim list --resource --scope <scope>' to see all available roles.")
                     raise typer.Exit(1)
-
-                if len(matches) == 1:
-                    role_id = matches[0].id
-                else:
-                    if not is_interactive():
-                        console.print(
-                            f"[red]Multiple eligible roles named '{escape(role_id)}' found at scope '{escape(scope)}'.[/red]"
-                        )
-                        console.print("[yellow]Tip:[/yellow] Activate by number (from 'az-pim list --resource') or pass the full roleDefinitionId.")
-                        raise typer.Exit(1)
-
-                    console.print(
-                        f"[yellow]Multiple matches for '{escape(role_id)}'. Select the one to activate:[/yellow]"
-                    )
-                    match_table = Table(show_header=True, header_style="bold magenta")
-                    match_table.add_column("#", style="bold white", justify="right", width=4)
-                    match_table.add_column("Role", style="cyan")
-                    match_table.add_column("Scope", style="dim")
-                    match_table.add_column("RoleDefinitionId", style="dim")
-                    for idx, m in enumerate(matches, start=1):
-                        match_table.add_row(str(idx), m.name, m.get_short_scope(), m.id)
-                    console.print(match_table)
-
-                    selection = typer.prompt("Enter selection", default="1")
-                    try:
-                        sel_idx = int(selection)
-                        if sel_idx < 1 or sel_idx > len(matches):
-                            raise ValueError
-                    except ValueError:
-                        console.print("[red]Invalid selection.[/red]")
-                        raise typer.Exit(1)
-                    role_id = matches[sel_idx - 1].id
+                
+                role_id = resolved_role.id
 
         # Prompt for missing required inputs with defaults implied by TTY
         if is_interactive() and duration is None:
@@ -636,6 +745,7 @@ def view_history(
     try:
         auth = AzureAuth()
         client = PIMClient(auth)
+        config = Config()
 
         console.print(f"[bold blue]Fetching activation history (last {days} days)...[/bold blue]")
 
@@ -643,6 +753,9 @@ def view_history(
             if not scope:
                 subscription_id = auth.get_subscription_id()
                 scope = f"subscriptions/{subscription_id}"
+            else:
+                # Resolve scope input to full path
+                scope = resolve_scope_input(scope, auth, client, config)
             activations = client.list_resource_activation_history(scope=scope, days=days)
         else:
             activations = client.list_activation_history(days=days)

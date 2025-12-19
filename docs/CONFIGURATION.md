@@ -13,6 +13,11 @@ The configuration file is stored at: `~/.az-pim-cli/config.yml`
 defaults:
   duration: "PT8H"  # Default to 8 hours
   justification: "Requested via az-pim-cli"
+  
+  # Smart input resolution settings
+  fuzzy_matching: true           # Enable fuzzy name matching
+  fuzzy_threshold: 0.8           # Minimum similarity score (0.0-1.0)
+  cache_ttl_seconds: 300         # Cache eligible roles for 5 minutes
 
 # Role aliases
 aliases:
@@ -104,6 +109,112 @@ Durations use ISO 8601 format:
 - Ticket info is only sent when both `ticket` and `ticket-system` are supplied; incomplete pairs are ignored in non-TTY and prompted to complete in TTY.
 
 ## Advanced Configuration
+
+### Smart Input Resolution
+
+The CLI now supports intelligent input matching for roles and scopes, making it easier to activate roles without exact names:
+
+#### Matching Strategies (in priority order)
+
+1. **Exact Match**: Exact string match (fastest)
+   ```bash
+   az-pim activate "Security Administrator"
+   ```
+
+2. **Case-Insensitive Match**: Ignores case differences
+   ```bash
+   az-pim activate "security administrator"  # Matches "Security Administrator"
+   ```
+
+3. **Prefix Match**: Matches beginning of name
+   ```bash
+   az-pim activate "Security"  # Matches "Security Administrator" or "Security Reader"
+   ```
+
+4. **Fuzzy Match**: Handles typos and partial matches
+   ```bash
+   az-pim activate "Sec Admin"  # Matches "Security Administrator"
+   az-pim activate "Contributer"  # Matches "Contributor" (fixes typo)
+   ```
+
+#### Configuration Options
+
+```yaml
+defaults:
+  # Enable/disable fuzzy matching
+  fuzzy_matching: true
+  
+  # Minimum similarity score for fuzzy matches (0.0 = any match, 1.0 = exact only)
+  fuzzy_threshold: 0.8
+  
+  # Cache results to reduce API calls (in seconds)
+  cache_ttl_seconds: 300
+```
+
+#### Interactive vs Non-Interactive Mode
+
+**Interactive (TTY):**
+- Multiple matches: Shows numbered list for selection
+- No matches: Shows "Did you mean?" suggestions
+- User-friendly error messages with tips
+
+**Non-Interactive (Scripts/Automation):**
+- Single match: Uses it silently
+- Multiple matches: Fails with error listing all candidates
+- No matches: Fails with suggestions for troubleshooting
+
+#### Enhanced Fuzzy Matching (Optional)
+
+For better performance with large role sets, install the optional fuzzy matching library:
+
+```bash
+pip install az-pim-cli[fuzzy]
+```
+
+This installs `rapidfuzz` for faster and more accurate fuzzy matching. The CLI automatically uses it if available, otherwise falls back to Python's built-in `difflib`.
+
+#### Examples
+
+```bash
+# Exact match (no ambiguity)
+az-pim activate Owner
+
+# Partial name (unique prefix)
+az-pim activate Sec  # If only one role starts with "Sec"
+
+# Typo correction
+az-pim activate Contribtor  # Fuzzy matches "Contributor"
+
+# Interactive selection with multiple matches
+az-pim activate Security
+# Shows:
+# 1. Security Administrator
+# 2. Security Reader
+# Select number: _
+
+# Scope matching (subscription or resource group names)
+az-pim activate Owner --scope "Production"  # Matches subscription/RG named "Production"
+az-pim activate Owner --scope "prod"  # Matches "Production-Subscription" via prefix
+```
+
+#### Disabling Fuzzy Matching
+
+If you prefer exact matching only (for scripts), disable fuzzy matching:
+
+```yaml
+defaults:
+  fuzzy_matching: false
+```
+
+Or use exact role IDs/full paths to bypass matching entirely:
+
+```bash
+# Use full role definition ID
+az-pim activate "/providers/Microsoft.Authorization/roleDefinitions/8e3af657-a8ff-443c-a75c-2fe8c4bcb635"
+
+# Use full scope path
+az-pim activate Owner --scope "/subscriptions/12345678-1234-1234-1234-123456789abc"
+```
 
 ### Using Resource-Specific Scopes
 

@@ -61,7 +61,13 @@ class Config:
                     "scope": "directory",
                 }
             },
-            "defaults": {"duration": "PT8H", "justification": "Requested via az-pim-cli"},
+            "defaults": {
+                "duration": "PT8H",
+                "justification": "Requested via az-pim-cli",
+                "fuzzy_matching": True,
+                "fuzzy_threshold": 0.8,
+                "cache_ttl_seconds": 300,
+            },
         }
 
     def save(self) -> None:
@@ -165,17 +171,19 @@ class Config:
         """
         return self._config.get("aliases", {})
 
-    def get_default(self, key: str) -> Optional[Any]:
+    def get_default(self, key: str, fallback: Optional[Any] = None) -> Optional[Any]:
         """
         Get default configuration value.
 
         Args:
             key: Configuration key
+            fallback: Fallback value if key not found
 
         Returns:
-            Configuration value or None
+            Configuration value, fallback, or None
         """
-        return self._config.get("defaults", {}).get(key)
+        value = self._config.get("defaults", {}).get(key)
+        return value if value is not None else fallback
 
     def get_config_path(self) -> Path:
         """
