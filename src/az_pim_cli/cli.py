@@ -10,7 +10,6 @@ from rich.table import Table
 
 from az_pim_cli.auth import AzureAuth
 from az_pim_cli.config import Config
-from az_pim_cli.models import normalize_roles, RoleSource, SUBSCRIPTION_ID_DISPLAY_LENGTH
 from az_pim_cli.exceptions import (
     AuthenticationError,
     NetworkError,
@@ -19,7 +18,11 @@ from az_pim_cli.exceptions import PermissionError as PIMPermissionError
 from az_pim_cli.exceptions import (
     PIMError,
 )
-from az_pim_cli.models import RoleSource, normalize_roles
+from az_pim_cli.models import (
+    SUBSCRIPTION_ID_DISPLAY_LENGTH,
+    RoleSource,
+    normalize_roles,
+)
 from az_pim_cli.pim_client import PIMClient
 
 app = typer.Typer(
@@ -141,15 +144,17 @@ def list_roles(
             alias_table.add_column("Description", style="dim")
             alias_table.add_column("Scope", style="dim")
 
-            for idx, (alias_role, alias_config) in enumerate(zip(alias_roles, alias_configs), start=1):
+            for idx, (alias_role, alias_config) in enumerate(
+                zip(alias_roles, alias_configs), start=1
+            ):
                 # Extract alias details
                 alias_name = alias_role.alias_name or "Unknown"
                 role_name = alias_role.name
                 duration_display = alias_role.end_time if alias_role.end_time else "-"
-                
+
                 # Get description from the already-fetched alias config
                 description = alias_config.get("justification", "-") if alias_config else "-"
-                
+
                 # Format scope display
                 scope_display = alias_role.resource_name or (
                     alias_role.scope if full_scope else alias_role.get_short_scope()
@@ -171,7 +176,7 @@ def list_roles(
         if azure_roles:
             role_type = "Resource Roles" if resource else "Azure AD Roles"
             console.print(f"[bold green]Eligible {role_type}[/bold green]")
-            
+
             roles_table = Table(show_header=True, header_style="bold magenta")
             roles_table.add_column("#", style="bold white", justify="right", width=4)
             roles_table.add_column("Role", style="cyan")
@@ -678,7 +683,7 @@ def list_aliases() -> None:
             duration = alias_config.get("duration", "Default")
             description = alias_config.get("justification", "-")
             scope = alias_config.get("scope", "directory")
-            
+
             # Add subscription info to scope if present
             subscription_id = alias_config.get("subscription", "")
             if scope == "subscription" and subscription_id:
