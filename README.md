@@ -31,7 +31,7 @@ pip install az-pim-cli
 
 ## Prerequisites
 
-- Python 3.8 or higher
+- Python 3.10 or higher
 - Azure CLI installed and logged in (`az login`)
 - Appropriate permissions to manage PIM roles
 
