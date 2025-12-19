@@ -153,7 +153,7 @@ def test_extract_token_claim_missing_claim():
 
 
 def test_get_user_object_id_from_token():
-    """Test getting user object ID from token with ARM scope."""
+    """Test getting user object ID from token."""
     import json
     import base64
 
@@ -164,26 +164,8 @@ def test_get_user_object_id_from_token():
 
     auth = AzureAuth()
     with patch.object(auth, "get_token", return_value=mock_token):
-        # Test with ARM scope (default)
         oid = auth.get_user_object_id()
         assert oid == "user-object-123"
-
-
-def test_get_user_object_id_with_graph_scope():
-    """Test getting user object ID from token with Graph scope."""
-    import json
-    import base64
-
-    payload = {"oid": "user-object-456"}
-    payload_json = json.dumps(payload).encode()
-    payload_b64 = base64.urlsafe_b64encode(payload_json).decode().rstrip("=")
-    mock_token = f"header.{payload_b64}.signature"
-
-    auth = AzureAuth()
-    with patch.object(auth, "get_token", return_value=mock_token):
-        # Test with explicit Graph scope
-        oid = auth.get_user_object_id(scope="https://graph.microsoft.com/.default")
-        assert oid == "user-object-456"
 
 
 def test_get_tenant_id_from_token():
