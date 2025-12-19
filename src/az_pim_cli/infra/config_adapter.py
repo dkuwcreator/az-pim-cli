@@ -8,9 +8,8 @@ Environment Variables:
     AZ_PIM_BACKEND: Choose API backend - 'ARM' (default) or 'GRAPH'.
 """
 
-import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import yaml
 from pydantic import BaseModel, Field, field_validator
@@ -20,20 +19,20 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class AliasConfig(BaseModel):
     """Configuration for a role alias."""
 
-    role: Optional[str] = None
-    duration: Optional[str] = None
-    justification: Optional[str] = None
-    scope: Optional[str] = None
-    subscription: Optional[str] = None
-    resource_group: Optional[str] = None
-    resource: Optional[str] = None
-    resource_type: Optional[str] = None
-    membership: Optional[str] = None
-    condition: Optional[str] = None
+    role: str | None = None
+    duration: str | None = None
+    justification: str | None = None
+    scope: str | None = None
+    subscription: str | None = None
+    resource_group: str | None = None
+    resource: str | None = None
+    resource_type: str | None = None
+    membership: str | None = None
+    condition: str | None = None
 
     @field_validator("duration")
     @classmethod
-    def validate_duration(cls, v: Optional[str]) -> Optional[str]:
+    def validate_duration(cls, v: str | None) -> str | None:
         """Validate ISO 8601 duration format."""
         if v and not v.startswith("PT"):
             # Allow simple hour format like "8" and convert to "PT8H"
@@ -56,9 +55,7 @@ class DefaultsConfig(BaseModel):
     fuzzy_threshold: float = Field(
         default=0.8, ge=0.0, le=1.0, description="Minimum similarity for fuzzy matches"
     )
-    cache_ttl_seconds: int = Field(
-        default=300, ge=0, description="Cache TTL in seconds"
-    )
+    cache_ttl_seconds: int = Field(default=300, ge=0, description="Cache TTL in seconds")
 
 
 class AppSettings(BaseSettings):
@@ -96,7 +93,7 @@ class EnhancedConfig:
     DEFAULT_CONFIG_DIR = Path.home() / ".az-pim-cli"
     DEFAULT_CONFIG_FILE = "config.yml"
 
-    def __init__(self, config_path: Optional[Path] = None) -> None:
+    def __init__(self, config_path: Path | None = None) -> None:
         """
         Initialize configuration.
 
@@ -114,14 +111,14 @@ class EnhancedConfig:
         self.settings = AppSettings()
 
         # Load file-based configuration
-        self._aliases: Dict[str, AliasConfig] = {}
+        self._aliases: dict[str, AliasConfig] = {}
         self._defaults = DefaultsConfig()
         self._load_config()
 
     def _load_config(self) -> None:
         """Load configuration from YAML file."""
         if self.config_path.exists():
-            with open(self.config_path, "r") as f:
+            with open(self.config_path) as f:
                 raw_config = yaml.safe_load(f) or {}
 
             # Load aliases with validation
@@ -163,8 +160,7 @@ class EnhancedConfig:
         # Convert to dict for YAML serialization
         config_dict = {
             "aliases": {
-                name: alias.model_dump(exclude_none=True)
-                for name, alias in self._aliases.items()
+                name: alias.model_dump(exclude_none=True) for name, alias in self._aliases.items()
             },
             "defaults": self._defaults.model_dump(exclude_none=True),
         }
@@ -172,7 +168,7 @@ class EnhancedConfig:
         with open(self.config_path, "w") as f:
             yaml.dump(config_dict, f, default_flow_style=False)
 
-    def get_alias(self, name: str) -> Optional[Dict[str, Any]]:
+    def get_alias(self, name: str) -> dict[str, Any] | None:
         """Get alias configuration by name."""
         alias = self._aliases.get(name)
         return alias.model_dump(exclude_none=True) if alias else None
@@ -180,16 +176,16 @@ class EnhancedConfig:
     def add_alias(
         self,
         name: str,
-        role: Optional[str] = None,
-        duration: Optional[str] = None,
-        justification: Optional[str] = None,
-        scope: Optional[str] = None,
-        subscription: Optional[str] = None,
-        resource_group: Optional[str] = None,
-        resource: Optional[str] = None,
-        resource_type: Optional[str] = None,
-        membership: Optional[str] = None,
-        condition: Optional[str] = None,
+        role: str | None = None,
+        duration: str | None = None,
+        justification: str | None = None,
+        scope: str | None = None,
+        subscription: str | None = None,
+        resource_group: str | None = None,
+        resource: str | None = None,
+        resource_type: str | None = None,
+        membership: str | None = None,
+        condition: str | None = None,
     ) -> None:
         """Add or update an alias with validation."""
         alias_config = AliasConfig(
@@ -215,14 +211,11 @@ class EnhancedConfig:
             return True
         return False
 
-    def list_aliases(self) -> Dict[str, Dict[str, Any]]:
+    def list_aliases(self) -> dict[str, dict[str, Any]]:
         """List all aliases."""
-        return {
-            name: alias.model_dump(exclude_none=True)
-            for name, alias in self._aliases.items()
-        }
+        return {name: alias.model_dump(exclude_none=True) for name, alias in self._aliases.items()}
 
-    def get_default(self, key: str, fallback: Optional[Any] = None) -> Any:
+    def get_default(self, key: str, fallback: Any | None = None) -> Any:
         """Get default configuration value."""
         try:
             value = getattr(self._defaults, key)

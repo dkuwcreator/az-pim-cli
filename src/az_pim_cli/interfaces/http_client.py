@@ -4,7 +4,7 @@ This module defines the protocol (interface) for HTTP clients,
 allowing the infrastructure implementation to be swappable.
 """
 
-from typing import Any, Dict, Optional, Protocol
+from typing import Any, Protocol
 
 
 class HTTPClientProtocol(Protocol):
@@ -13,10 +13,10 @@ class HTTPClientProtocol(Protocol):
     def get(
         self,
         url: str,
-        headers: Optional[Dict[str, str]] = None,
-        params: Optional[Dict[str, Any]] = None,
-        timeout: Optional[float] = None,
-    ) -> Dict[str, Any]:
+        headers: dict[str, str] | None = None,
+        params: dict[str, Any] | None = None,
+        timeout: float | None = None,
+    ) -> dict[str, Any]:
         """
         Make a GET request.
 
@@ -39,11 +39,11 @@ class HTTPClientProtocol(Protocol):
     def post(
         self,
         url: str,
-        headers: Optional[Dict[str, str]] = None,
-        params: Optional[Dict[str, Any]] = None,
-        json_data: Optional[Dict[str, Any]] = None,
-        timeout: Optional[float] = None,
-    ) -> Dict[str, Any]:
+        headers: dict[str, str] | None = None,
+        params: dict[str, Any] | None = None,
+        json_data: dict[str, Any] | None = None,
+        timeout: float | None = None,
+    ) -> dict[str, Any]:
         """
         Make a POST request.
 
@@ -67,11 +67,11 @@ class HTTPClientProtocol(Protocol):
     def put(
         self,
         url: str,
-        headers: Optional[Dict[str, str]] = None,
-        params: Optional[Dict[str, Any]] = None,
-        json_data: Optional[Dict[str, Any]] = None,
-        timeout: Optional[float] = None,
-    ) -> Dict[str, Any]:
+        headers: dict[str, str] | None = None,
+        params: dict[str, Any] | None = None,
+        json_data: dict[str, Any] | None = None,
+        timeout: float | None = None,
+    ) -> dict[str, Any]:
         """
         Make a PUT request.
 

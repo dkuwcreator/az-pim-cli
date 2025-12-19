@@ -68,7 +68,11 @@ select = [
     "C4",  # flake8-comprehensions
     "UP",  # pyupgrade
 ]
-ignore = ["E501"]  # line too long (handled by formatter)
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "B904",  # raise from - allow simplified exception handling for backward compat
+    "B905",  # zip strict - not critical for this codebase
+]
 
 [tool.ruff.format]
 quote-style = "double"

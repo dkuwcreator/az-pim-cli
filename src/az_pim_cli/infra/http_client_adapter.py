@@ -6,7 +6,7 @@ interface for swappability.
 """
 
 import socket
-from typing import Any, Dict, Optional
+from typing import Any
 
 import httpx
 from tenacity import (
@@ -101,9 +101,9 @@ class HTTPXAdapter:
         self,
         method: str,
         url: str,
-        headers: Optional[Dict[str, str]] = None,
-        params: Optional[Dict[str, Any]] = None,
-        json_data: Optional[Dict[str, Any]] = None,
+        headers: dict[str, str] | None = None,
+        params: dict[str, Any] | None = None,
+        json_data: dict[str, Any] | None = None,
     ) -> httpx.Response:
         """
         Make HTTP request with automatic retry for transient errors.
@@ -136,7 +136,7 @@ class HTTPXAdapter:
 
     def _handle_response(
         self, response: httpx.Response, operation: str = "API request"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Handle HTTP response and convert to JSON.
 
@@ -186,10 +186,10 @@ class HTTPXAdapter:
     def get(
         self,
         url: str,
-        headers: Optional[Dict[str, str]] = None,
-        params: Optional[Dict[str, Any]] = None,
-        timeout: Optional[float] = None,
-    ) -> Dict[str, Any]:
+        headers: dict[str, str] | None = None,
+        params: dict[str, Any] | None = None,
+        timeout: float | None = None,
+    ) -> dict[str, Any]:
         """
         Make a GET request.
 
@@ -223,11 +223,11 @@ class HTTPXAdapter:
     def post(
         self,
         url: str,
-        headers: Optional[Dict[str, str]] = None,
-        params: Optional[Dict[str, Any]] = None,
-        json_data: Optional[Dict[str, Any]] = None,
-        timeout: Optional[float] = None,
-    ) -> Dict[str, Any]:
+        headers: dict[str, str] | None = None,
+        params: dict[str, Any] | None = None,
+        json_data: dict[str, Any] | None = None,
+        timeout: float | None = None,
+    ) -> dict[str, Any]:
         """
         Make a POST request.
 
@@ -263,11 +263,11 @@ class HTTPXAdapter:
     def put(
         self,
         url: str,
-        headers: Optional[Dict[str, str]] = None,
-        params: Optional[Dict[str, Any]] = None,
-        json_data: Optional[Dict[str, Any]] = None,
-        timeout: Optional[float] = None,
-    ) -> Dict[str, Any]:
+        headers: dict[str, str] | None = None,
+        params: dict[str, Any] | None = None,
+        json_data: dict[str, Any] | None = None,
+        timeout: float | None = None,
+    ) -> dict[str, Any]:
         """
         Make a PUT request.
 

@@ -14,7 +14,7 @@ Environment Variables:
 """
 
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import yaml
 
@@ -25,7 +25,7 @@ class Config:
     DEFAULT_CONFIG_DIR = Path.home() / ".az-pim-cli"
     DEFAULT_CONFIG_FILE = "config.yml"
 
-    def __init__(self, config_path: Optional[Path] = None) -> None:
+    def __init__(self, config_path: Path | None = None) -> None:
         """
         Initialize configuration.
 
@@ -39,18 +39,18 @@ class Config:
             self.config_path = config_path
             self.config_dir = config_path.parent
 
-        self._config: Dict[str, Any] = {}
+        self._config: dict[str, Any] = {}
         self._load_config()
 
     def _load_config(self) -> None:
         """Load configuration from file."""
         if self.config_path.exists():
-            with open(self.config_path, "r") as f:
+            with open(self.config_path) as f:
                 self._config = yaml.safe_load(f) or {}
         else:
             self._config = self._get_default_config()
 
-    def _get_default_config(self) -> Dict[str, Any]:
+    def _get_default_config(self) -> dict[str, Any]:
         """
         Get default configuration.
 
@@ -81,7 +81,7 @@ class Config:
         with open(self.config_path, "w") as f:
             yaml.dump(self._config, f, default_flow_style=False)
 
-    def get_alias(self, name: str) -> Optional[Dict[str, Any]]:
+    def get_alias(self, name: str) -> dict[str, Any] | None:
         """
         Get alias configuration by name.
 
@@ -96,16 +96,16 @@ class Config:
     def add_alias(
         self,
         name: str,
-        role: Optional[str] = None,
-        duration: Optional[str] = None,
-        justification: Optional[str] = None,
-        scope: Optional[str] = None,
-        subscription: Optional[str] = None,
-        resource_group: Optional[str] = None,
-        resource: Optional[str] = None,
-        resource_type: Optional[str] = None,
-        membership: Optional[str] = None,
-        condition: Optional[str] = None,
+        role: str | None = None,
+        duration: str | None = None,
+        justification: str | None = None,
+        scope: str | None = None,
+        subscription: str | None = None,
+        resource_group: str | None = None,
+        resource: str | None = None,
+        resource_type: str | None = None,
+        membership: str | None = None,
+        condition: str | None = None,
     ) -> None:
         """
         Add or update an alias.
@@ -126,7 +126,7 @@ class Config:
         if "aliases" not in self._config:
             self._config["aliases"] = {}
 
-        alias_config: Dict[str, Any] = {}
+        alias_config: dict[str, Any] = {}
         if role:
             alias_config["role"] = role
         if duration:
@@ -167,7 +167,7 @@ class Config:
             return True
         return False
 
-    def list_aliases(self) -> Dict[str, Dict[str, Any]]:
+    def list_aliases(self) -> dict[str, dict[str, Any]]:
         """
         List all aliases.
 
@@ -176,7 +176,7 @@ class Config:
         """
         return self._config.get("aliases", {})
 
-    def get_default(self, key: str, fallback: Optional[Any] = None) -> Optional[Any]:
+    def get_default(self, key: str, fallback: Any | None = None) -> Any | None:
         """
         Get default configuration value.
 

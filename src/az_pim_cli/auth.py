@@ -5,7 +5,6 @@ import json
 import os
 import socket
 from contextlib import contextmanager
-from typing import Optional
 
 from azure.identity import AzureCliCredential, DefaultAzureCredential
 
@@ -53,8 +52,8 @@ class AzureAuth:
 
     def __init__(self) -> None:
         """Initialize Azure authentication."""
-        self._credential: Optional[AzureCliCredential] = None
-        self._default_credential: Optional[DefaultAzureCredential] = None
+        self._credential: AzureCliCredential | None = None
+        self._default_credential: DefaultAzureCredential | None = None
         self._token_cache: dict[str, dict] = {}
 
     def _get_credential(self) -> AzureCliCredential | DefaultAzureCredential:
@@ -88,7 +87,7 @@ class AzureAuth:
         if self._default_credential is None:
             try:
                 self._default_credential = DefaultAzureCredential()
-            except Exception:
+            except Exception as e:
                 raise AuthenticationError(
                     "No Azure credentials available",
                     suggestion=(
@@ -96,7 +95,7 @@ class AzureAuth:
                         "or configure Azure SDK credentials "
                         "(service principal, managed identity, etc.)"
                     ),
-                )
+                ) from e
 
         try:
             # Test the credential
@@ -109,7 +108,7 @@ class AzureAuth:
                     "Run 'az login' to authenticate with Azure CLI, "
                     "or check your network connection"
                 ),
-            )
+            ) from e
 
     def get_token(self, scope: str = "https://management.azure.com/.default") -> str:
         """
@@ -137,9 +136,9 @@ class AzureAuth:
                     "Run 'az login' to authenticate with Azure CLI, "
                     "or check your network connection"
                 ),
-            )
+            ) from e
 
-    def _extract_token_claim(self, scope: str, claim: str) -> Optional[str]:
+    def _extract_token_claim(self, scope: str, claim: str) -> str | None:
         """
         Extract a claim from the JWT token payload.
 

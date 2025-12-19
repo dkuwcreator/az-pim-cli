@@ -4,13 +4,13 @@ This module defines the protocol for configuration management.
 """
 
 from pathlib import Path
-from typing import Any, Dict, Optional, Protocol
+from typing import Any, Protocol
 
 
 class ConfigProtocol(Protocol):
     """Protocol for configuration operations."""
 
-    def get_alias(self, name: str) -> Optional[Dict[str, Any]]:
+    def get_alias(self, name: str) -> dict[str, Any] | None:
         """
         Get alias configuration by name.
 
@@ -25,16 +25,16 @@ class ConfigProtocol(Protocol):
     def add_alias(
         self,
         name: str,
-        role: Optional[str] = None,
-        duration: Optional[str] = None,
-        justification: Optional[str] = None,
-        scope: Optional[str] = None,
-        subscription: Optional[str] = None,
-        resource_group: Optional[str] = None,
-        resource: Optional[str] = None,
-        resource_type: Optional[str] = None,
-        membership: Optional[str] = None,
-        condition: Optional[str] = None,
+        role: str | None = None,
+        duration: str | None = None,
+        justification: str | None = None,
+        scope: str | None = None,
+        subscription: str | None = None,
+        resource_group: str | None = None,
+        resource: str | None = None,
+        resource_type: str | None = None,
+        membership: str | None = None,
+        condition: str | None = None,
     ) -> None:
         """Add or update an alias."""
         ...
@@ -43,11 +43,11 @@ class ConfigProtocol(Protocol):
         """Remove an alias."""
         ...
 
-    def list_aliases(self) -> Dict[str, Dict[str, Any]]:
+    def list_aliases(self) -> dict[str, dict[str, Any]]:
         """List all aliases."""
         ...
 
-    def get_default(self, key: str, fallback: Optional[Any] = None) -> Any:
+    def get_default(self, key: str, fallback: Any | None = None) -> Any:
         """Get default configuration value."""
         ...
 

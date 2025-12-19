@@ -1,41 +1,23 @@
-"""Custom exceptions for Azure PIM CLI."""
+"""Custom exceptions for Azure PIM CLI.
 
+DEPRECATION NOTICE:
+    This module provides backward compatibility. New code should import from
+    az_pim_cli.domain.exceptions instead.
+"""
 
-class PIMError(Exception):
-    """Base exception for PIM CLI errors."""
+# Import from domain layer for backward compatibility
+from az_pim_cli.domain.exceptions import (  # noqa: F401
+    AuthenticationError,
+    NetworkError,
+    ParsingError,
+    PermissionError,
+    PIMError,
+)
 
-    pass
-
-
-class NetworkError(PIMError):
-    """Network-related errors (DNS, timeout, connection)."""
-
-    def __init__(self, message: str, endpoint: str = "", suggest_ipv4: bool = False):
-        self.endpoint = endpoint
-        self.suggest_ipv4 = suggest_ipv4
-        super().__init__(message)
-
-
-class PermissionError(PIMError):
-    """Permission-related errors (403, authorization)."""
-
-    def __init__(self, message: str, endpoint: str = "", required_permissions: str = ""):
-        self.endpoint = endpoint
-        self.required_permissions = required_permissions
-        super().__init__(message)
-
-
-class AuthenticationError(PIMError):
-    """Authentication errors (expired token, login required)."""
-
-    def __init__(self, message: str, suggestion: str = ""):
-        self.suggestion = suggestion
-        super().__init__(message)
-
-
-class ParsingError(PIMError):
-    """Response parsing errors."""
-
-    def __init__(self, message: str, response_data: str = ""):
-        self.response_data = response_data
-        super().__init__(message)
+__all__ = [
+    "PIMError",
+    "NetworkError",
+    "PermissionError",
+    "AuthenticationError",
+    "ParsingError",
+]
