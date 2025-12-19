@@ -60,7 +60,7 @@ jobs:
       
       - name: Run bandit security scan
         run: |
-          bandit -r src/ -f json -o bandit-report.json || true
+          bandit -r src/ -f json -o bandit-report.json
           bandit -r src/ -ll
       
       - name: Upload bandit report
