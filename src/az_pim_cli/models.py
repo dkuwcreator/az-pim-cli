@@ -7,6 +7,9 @@ into a common role model, keeping UI logic stable when switching backends.
 from typing import Any, Dict, List, Optional
 from enum import Enum
 
+# Constants
+SUBSCRIPTION_ID_DISPLAY_LENGTH = 8  # Number of characters to show from subscription IDs
+
 
 class RoleSource(Enum):
     """Source of role data."""
@@ -68,7 +71,7 @@ class NormalizedRole:
         if "subscriptions" in parts:
             sub_idx = parts.index("subscriptions")
             if sub_idx + 1 < len(parts):
-                sub_id = parts[sub_idx + 1][:8]  # First 8 chars of subscription ID
+                sub_id = parts[sub_idx + 1][:SUBSCRIPTION_ID_DISPLAY_LENGTH]
                 if "resourceGroups" in parts:
                     rg_idx = parts.index("resourceGroups")
                     if rg_idx + 1 < len(parts):

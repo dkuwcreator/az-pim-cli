@@ -11,7 +11,7 @@ from rich.markup import escape
 from az_pim_cli.auth import AzureAuth
 from az_pim_cli.pim_client import PIMClient
 from az_pim_cli.config import Config
-from az_pim_cli.models import normalize_roles, RoleSource
+from az_pim_cli.models import normalize_roles, RoleSource, SUBSCRIPTION_ID_DISPLAY_LENGTH
 from az_pim_cli.exceptions import (
     PIMError,
     NetworkError,
@@ -110,9 +110,11 @@ def list_roles(
         # Load aliases and convert to NormalizedRole objects
         aliases = config.list_aliases()
         alias_roles = []
+        alias_configs = []  # Store configs to avoid redundant lookups
         for alias_name, alias_config in aliases.items():
             alias_role = alias_to_normalized_role(alias_name, alias_config)
             alias_roles.append(alias_role)
+            alias_configs.append(alias_config)
 
         # Combine aliases first, then Azure roles (for numbering consistency)
         all_roles = alias_roles + azure_roles
@@ -136,15 +138,14 @@ def list_roles(
             alias_table.add_column("Description", style="dim")
             alias_table.add_column("Scope", style="dim")
 
-            for idx, alias_role in enumerate(alias_roles, start=1):
+            for idx, (alias_role, alias_config) in enumerate(zip(alias_roles, alias_configs), start=1):
                 # Extract alias details
                 alias_name = alias_role.alias_name or "Unknown"
                 role_name = alias_role.name
                 duration_display = alias_role.end_time if alias_role.end_time else "-"
                 
-                # Get description from raw alias config
-                alias_config = config.get_alias(alias_name)
-                description = alias_config.get("justification", "-") if alias_config else "-"
+                # Get description from the already-fetched alias config
+                description = alias_config.get("justification", "-")
                 
                 # Format scope display
                 scope_display = alias_role.resource_name or (
@@ -677,7 +678,7 @@ def list_aliases() -> None:
             
             # Add subscription info to scope if present
             if scope == "subscription" and alias_config.get("subscription"):
-                sub_id = alias_config["subscription"][:8]  # First 8 chars
+                sub_id = alias_config["subscription"][:SUBSCRIPTION_ID_DISPLAY_LENGTH]
                 scope = f"{scope} (sub:{sub_id}...)"
 
             table.add_row(alias_name, role, duration, description, scope)
