@@ -223,12 +223,9 @@ class AzureAuth:
                 "Ensure you have selected a subscription with 'az account set --subscription <sub>'."
             )
 
-    def get_user_object_id(self, scope: str = "https://management.azure.com/.default") -> str:
+    def get_user_object_id(self) -> str:
         """
         Get the current user's object ID from the access token claims.
-
-        Args:
-            scope: The scope for the access token (ARM or Graph)
 
         Returns:
             User object ID string
@@ -236,7 +233,7 @@ class AzureAuth:
         Raises:
             RuntimeError: If object ID cannot be determined
         """
-        object_id = self._extract_token_claim(scope, "oid")
+        object_id = self._extract_token_claim("https://graph.microsoft.com/.default", "oid")
 
         if object_id:
             return object_id

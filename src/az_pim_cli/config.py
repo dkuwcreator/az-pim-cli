@@ -49,28 +49,17 @@ class Config:
         """
         Get default configuration.
 
-        Note: In v2.0, aliases require prefixes to identify their command:
-        - 'res:' for resource roles (azp-res)
-        - 'entra:' for Entra directory roles (azp-entra)
-        - 'groups:' for group memberships (azp-groups)
-
         Returns:
             Default configuration dictionary
         """
         return {
             "aliases": {
-                "entra:example": {
+                "example": {
                     "role": "Global Administrator",
                     "duration": "PT8H",
                     "justification": "Administrative tasks",
                     "scope": "directory",
-                },
-                "res:example": {
-                    "role": "Owner",
-                    "duration": "PT4H",
-                    "justification": "Production deployment",
-                    "scope": "subscriptions/YOUR_SUBSCRIPTION_ID",
-                },
+                }
             },
             "defaults": {"duration": "PT8H", "justification": "Requested via az-pim-cli"},
         }
@@ -175,28 +164,6 @@ class Config:
             Dictionary of aliases
         """
         return self._config.get("aliases", {})
-
-    def list_aliases_by_prefix(self, prefix: str) -> Dict[str, Dict[str, Any]]:
-        """
-        List aliases with a specific prefix (e.g., 'res', 'entra', 'groups').
-
-        Args:
-            prefix: Prefix to filter aliases (e.g., 'res', 'entra', 'groups')
-
-        Returns:
-            Dictionary of aliases with the specified prefix
-        """
-        all_aliases = self._config.get("aliases", {})
-        prefix_with_colon = f"{prefix}:"
-
-        filtered_aliases = {}
-        for alias_name, alias_config in all_aliases.items():
-            if alias_name.startswith(prefix_with_colon):
-                # Remove prefix for display
-                short_name = alias_name[len(prefix_with_colon) :]
-                filtered_aliases[short_name] = alias_config
-
-        return filtered_aliases
 
     def get_default(self, key: str) -> Optional[Any]:
         """

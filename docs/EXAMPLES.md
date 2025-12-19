@@ -1,443 +1,312 @@
-# Examples
+# Azure PIM CLI Examples
 
-This guide provides practical examples for using Azure PIM CLI v2.0 with the three focused commands:
-- `azp-res` (Azure resources)
-- `azp-entra` (Entra directory roles)
-- `azp-groups` (Entra group memberships)
+This document provides practical examples for using the Azure PIM CLI.
 
-## Table of Contents
+## Basic Usage
 
-- [Azure Resources (`azp-res`)](#azure-resources-azp-res)
-- [Entra Directory Roles (`azp-entra`)](#entra-directory-roles-azp-entra)
-- [Entra Group Memberships (`azp-groups`)](#entra-group-memberships-azp-groups)
-- [Verbose Logging](#verbose-logging)
-- [Common Scenarios](#common-scenarios)
-
-## Azure Resources (`azp-res`)
-
-### List Eligible Resource Roles
+### List Available Roles
 
 ```bash
-# List roles for current subscription
-azp-res list
+# List all eligible Azure AD roles
+az-pim list
+
+# List eligible resource roles for current subscription
+az-pim list --resource
 
 # List roles for specific subscription
-azp-res list --scope "subscriptions/12345678-1234-1234-1234-123456789abc"
+az-pim list --resource --scope "subscriptions/12345678-1234-1234-1234-123456789abc"
 
-# List roles for resource group
-azp-res list --scope "subscriptions/{sub-id}/resourceGroups/my-rg"
+# Interactive selection mode - list roles and activate
+az-pim list --select
 
-# Limit results
-azp-res list --limit 10
+# Interactive selection for resource roles
+az-pim list --resource --select
+```
 
-# Show full scope paths
-azp-res list --full-scope
+### Activate Roles
+
+```bash
+# Activate Azure AD role with defaults
+az-pim activate "Global Administrator"
+
+# Activate with custom duration (4 hours)
+az-pim activate "Security Administrator" --duration 4
+
+# Activate with custom justification
+az-pim activate "User Administrator" \
+  --duration 2 \
+  --justification "User account management tasks"
+
+# Activate with ticket information
+az-pim activate "Privileged Role Administrator" \
+  --duration 4 \
+  --justification "PIM configuration update" \
+  --ticket "INC123456" \
+  --ticket-system "ServiceNow"
+
+# Activate by role number (from list output)
+az-pim activate 1 --duration 4 --justification "Quick access"
+
+# Using # prefix with role number
+az-pim activate "#3" --duration 2 --justification "Emergency access"
 ```
 
 ### Activate Resource Roles
 
 ```bash
-# Activate with role ID
-azp-res activate "/subscriptions/{sub-id}/providers/Microsoft.Authorization/roleDefinitions/{role-id}"
-
-# With custom duration and justification
-azp-res activate "{role-id}" \
-  --duration 4 \
+# Activate subscription Owner role
+az-pim activate "8e3af657-a8ff-443c-a75c-2fe8c4bcb635" \
+  --resource \
+  --scope "subscriptions/12345678-1234-1234-1234-123456789abc" \
+  --duration 8 \
   --justification "Production deployment"
 
-# With specific scope
-azp-res activate "{role-id}" \
-  --scope "subscriptions/{sub-id}/resourceGroups/my-rg" \
-  --duration 2
+# Activate Contributor role for current subscription
+az-pim activate "Contributor" --resource --duration 4
 
-# With ticket information
-azp-res activate "{role-id}" \
-  --duration 4 \
-  --ticket "INC123456" \
-  --ticket-system "ServiceNow"
+# Activate resource role by number
+az-pim activate 2 --resource --duration 4 --justification "Quick access"
 ```
 
-### Resource Role Scenarios
+## Alias Management
 
-**Scenario 1: Emergency production access**
-```bash
-# Quick 2-hour access
-azp-res activate "{owner-role-id}" \
-  --duration 2 \
-  --justification "Emergency: Production incident INC-123"
-```
-
-**Scenario 2: Planned maintenance window**
-```bash
-# 4-hour access for maintenance
-azp-res activate "{contributor-role-id}" \
-  --duration 4 \
-  --justification "Planned maintenance window" \
-  --ticket "CHG0012345" \
-  --ticket-system "ServiceNow"
-```
-
-**Scenario 3: Resource group specific access**
-```bash
-# Access to specific resource group only
-azp-res activate "{role-id}" \
-  --scope "subscriptions/{sub-id}/resourceGroups/prod-rg" \
-  --duration 8 \
-  --justification "Application deployment"
-```
-
-## Entra Directory Roles (`azp-entra`)
-
-### List Eligible Entra Roles
+### Create Aliases
 
 ```bash
-# List all eligible Entra directory roles
-azp-entra list
+# Simple Azure AD role alias
+az-pim alias add emergency-admin "Global Administrator" \
+  --duration "PT2H" \
+  --justification "Emergency access"
 
-# Limit results
-azp-entra list --limit 5
+# Resource role alias with subscription
+az-pim alias add prod-access "Owner" \
+  --duration "PT8H" \
+  --justification "Production deployment" \
+  --scope "subscription" \
+  --subscription "12345678-1234-1234-1234-123456789abc"
+
+# Development environment alias
+az-pim alias add dev-access "Contributor" \
+  --duration "PT12H" \
+  --justification "Development work" \
+  --scope "subscription" \
+  --subscription "87654321-4321-4321-4321-210987654321"
 ```
 
-### Activate Entra Roles
+### Use Aliases
 
 ```bash
-# Activate an Entra role
-azp-entra activate "{role-id}"
+# Activate using alias
+az-pim activate emergency-admin
 
-# With custom duration and justification
-azp-entra activate "{role-id}" \
-  --duration 2 \
-  --justification "Emergency password reset"
+# Override alias duration
+az-pim activate prod-access --duration 4
 
-# With ticket information
-azp-entra activate "{role-id}" \
-  --duration 1 \
-  --ticket "INC999999" \
-  --ticket-system "ServiceNow"
+# Override alias justification
+az-pim activate dev-access --justification "Hotfix deployment"
 ```
 
-### View Activation History
+### Manage Aliases
 
 ```bash
-# View last 30 days (default)
-azp-entra history
+# List all configured aliases
+az-pim alias list
 
-# View last 7 days
-azp-entra history --days 7
-
-# View last 90 days
-azp-entra history --days 90
+# Remove an alias
+az-pim alias remove emergency-admin
 ```
 
-### Approval Workflow
+## Approval Workflow
+
+### List and Approve Requests
 
 ```bash
 # List pending approval requests
-azp-entra pending
+az-pim pending
 
-# Approve a specific request
-azp-entra approve {request-id} \
+# Approve a request
+az-pim approve "12345678-abcd-efgh-ijkl-123456789012" \
   --justification "Approved for scheduled maintenance"
 ```
 
-### Entra Role Scenarios
+## View History
 
-**Scenario 1: Emergency Global Admin access**
 ```bash
-# 1-hour emergency access
-azp-entra activate "{global-admin-role-id}" \
-  --duration 1 \
-  --justification "Emergency: Account lockout recovery"
+# View last 30 days of activations
+az-pim history
+
+# View last 7 days
+az-pim history --days 7
+
+# View last 90 days
+az-pim history --days 90
 ```
 
-**Scenario 2: User administration**
+## Common Scenarios
+
+### Scenario 1: Emergency Break-Glass Access
+
 ```bash
-# 4-hour access for user management tasks
-azp-entra activate "{user-admin-role-id}" \
-  --duration 4 \
-  --justification "Quarterly user access review"
+# Create emergency admin alias
+az-pim alias add break-glass "Global Administrator" \
+  --duration "PT1H" \
+  --justification "Emergency break-glass access"
+
+# Use when needed
+az-pim activate break-glass --ticket "INC999999" --ticket-system "ServiceNow"
 ```
 
-**Scenario 3: Security operations**
+### Scenario 2: Scheduled Production Deployment
+
 ```bash
-# 8-hour access for security investigation
-azp-entra activate "{security-admin-role-id}" \
-  --duration 8 \
-  --justification "Security incident investigation" \
+# Create production deployment alias
+az-pim alias add prod-deploy "Owner" \
+  --duration "PT4H" \
+  --justification "Production deployment - Change #" \
+  --scope "subscription" \
+  --subscription "prod-sub-id"
+
+# Activate before deployment
+az-pim activate prod-deploy --justification "Production deployment - CHG123456"
+```
+
+### Scenario 3: Development Team Access
+
+```bash
+# Create dev access for team members
+az-pim alias add dev-contributor "Contributor" \
+  --duration "PT8H" \
+  --justification "Development work" \
+  --scope "subscription" \
+  --subscription "dev-sub-id"
+
+# Activate at start of workday
+az-pim activate dev-contributor
+```
+
+### Scenario 4: Security Investigation
+
+```bash
+# Create security investigation alias
+az-pim alias add security-investigation "Security Administrator" \
+  --duration "PT4H" \
+  --justification "Security incident investigation"
+
+# Activate for investigation
+az-pim activate security-investigation \
   --ticket "SEC-2024-001" \
   --ticket-system "Jira"
 ```
 
-## Entra Group Memberships (`azp-groups`)
-
-### List Eligible Group Assignments
+### Scenario 5: User Management
 
 ```bash
-# List all eligible group assignments
-azp-groups list
-
-# Limit results
-azp-groups list --limit 10
+# Quick user admin access
+az-pim activate "User Administrator" \
+  --duration 1 \
+  --justification "Password reset for executive team"
 ```
 
-### Activate Group Memberships
+### Scenario 6: Interactive Role Selection
 
 ```bash
-# Activate as member (default)
-azp-groups activate "{group-id}"
+# List roles and select interactively
+az-pim list --select
 
-# Activate as member with custom settings
-azp-groups activate "{group-id}" \
-  --access member \
-  --duration 8 \
-  --justification "Daily operations"
+# After seeing the list, you'll be prompted to:
+# 1. Enter the role number to activate
+# 2. Specify duration (default: 8 hours)
+# 3. Provide justification
 
-# Activate as owner
-azp-groups activate "{group-id}" \
-  --access owner \
-  --duration 4 \
-  --justification "Group management tasks"
-
-# With ticket information
-azp-groups activate "{group-id}" \
-  --access member \
-  --duration 2 \
-  --ticket "REQ456" \
-  --ticket-system "ServiceNow"
+# This is useful when you're not sure of the exact role name
+# or want a quick selection workflow
 ```
 
-### View Group Activation History
+### Scenario 7: Quick Activation by Number
 
 ```bash
-# View last 30 days (default)
-azp-groups history
+# First, list available roles to see the numbers
+az-pim list
 
-# View last 7 days
-azp-groups history --days 7
+# Then activate by number (much faster than typing full role ID)
+az-pim activate 1 --duration 4 --justification "Quick access needed"
+
+# Works with resource roles too
+az-pim list --resource
+az-pim activate "#2" --resource --duration 2 --justification "Emergency access"
 ```
 
-### Group Membership Scenarios
+## Automation Examples
 
-**Scenario 1: Security operations team**
-```bash
-# Join security operations group for shift
-azp-groups activate "{security-ops-group-id}" \
-  --access member \
-  --duration 8 \
-  --justification "Security operations shift"
-```
-
-**Scenario 2: Temporary group ownership**
-```bash
-# Become group owner for management tasks
-azp-groups activate "{team-group-id}" \
-  --access owner \
-  --duration 2 \
-  --justification "Group membership review"
-```
-
-**Scenario 3: Application support group**
-```bash
-# Join application support group
-azp-groups activate "{app-support-group-id}" \
-  --access member \
-  --duration 4 \
-  --justification "Application troubleshooting" \
-  --ticket "INC789" \
-  --ticket-system "Jira"
-```
-
-## Verbose Logging
-
-Enable verbose logging for any command to see detailed information:
+### Shell Script for Daily Access
 
 ```bash
-# Verbose resource listing
-azp-res list --verbose
+#!/bin/bash
+# activate-daily-access.sh
 
-# Verbose Entra role activation
-azp-entra activate "{role-id}" --verbose \
-  --duration 2 \
-  --justification "Test"
+echo "Activating daily development access..."
+az-pim activate dev-access
 
-# Verbose group listing
-azp-groups list --verbose
+echo "Activating monitoring access..."
+az-pim activate monitoring-reader
+
+echo "Access activated for 8 hours"
 ```
 
-Verbose output includes:
-- Command name
-- OAuth scope (ARM or Graph)
-- Backend hint
-- IPv4-only mode status
-- API calls and responses
-- Detailed error traces
+### Python Script for Conditional Activation
 
-## Common Scenarios
+```python
+#!/usr/bin/env python3
+import subprocess
+import sys
+from datetime import datetime
 
-### Scenario 1: Multi-Tier Application Deployment
+def activate_role(role_alias, duration=8, justification=""):
+    """Activate a PIM role using alias."""
+    cmd = [
+        "az-pim", "activate", role_alias,
+        "--duration", str(duration),
+        "--justification", justification
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    return result.returncode == 0
 
-```bash
-# Step 1: Activate resource role for infrastructure
-azp-res activate "{contributor-role-id}" \
-  --scope "subscriptions/{sub-id}/resourceGroups/app-rg" \
-  --duration 4 \
-  --justification "Application deployment - infrastructure"
-
-# Step 2: Activate Entra role for app registration
-azp-entra activate "{app-admin-role-id}" \
-  --duration 2 \
-  --justification "Application deployment - app registration"
-
-# Step 3: Join deployment team group
-azp-groups activate "{deploy-team-group-id}" \
-  --access member \
-  --duration 4 \
-  --justification "Application deployment"
+# Check if it's a weekday
+if datetime.now().weekday() < 5:  # Monday = 0, Friday = 4
+    print("Weekday detected, activating work roles...")
+    activate_role("dev-access", duration=8, justification="Daily development work")
+else:
+    print("Weekend - no automatic activation")
 ```
 
-### Scenario 2: Security Incident Response
+## Integration with CI/CD
 
-```bash
-# Activate multiple roles for comprehensive access
-
-# 1. Activate Security Administrator
-azp-entra activate "{security-admin-role-id}" \
-  --duration 4 \
-  --justification "Security incident response" \
-  --ticket "SEC-2024-042"
-
-# 2. Activate resource access for audit logs
-azp-res activate "{reader-role-id}" \
-  --duration 4 \
-  --justification "Security incident investigation"
-
-# 3. Join security operations group
-azp-groups activate "{security-ops-group-id}" \
-  --access member \
-  --duration 4 \
-  --justification "Security incident response"
-```
-
-### Scenario 3: Scheduled Maintenance Window
-
-```bash
-# 8-hour maintenance window
-
-# Activate resource Owner role
-azp-res activate "{owner-role-id}" \
-  --scope "subscriptions/{sub-id}" \
-  --duration 8 \
-  --justification "Scheduled maintenance window" \
-  --ticket "CHG0054321" \
-  --ticket-system "ServiceNow"
-
-# View activation history to confirm
-azp-res history  # Note: Resource history not yet implemented, use Azure Portal
-```
-
-### Scenario 4: Cross-Environment Access
-
-```bash
-# Development environment (longer duration)
-azp-res activate "{contributor-role-id}" \
-  --scope "subscriptions/{dev-sub-id}" \
-  --duration 8 \
-  --justification "Development work"
-
-# Production environment (shorter duration)
-azp-res activate "{contributor-role-id}" \
-  --scope "subscriptions/{prod-sub-id}" \
-  --duration 2 \
-  --justification "Production hotfix deployment" \
-  --ticket "INC-PROD-123"
-```
-
-### Scenario 5: Approval Workflow for Team
-
-```bash
-# As approver: Check pending requests
-azp-entra pending
-
-# Approve team member's request
-azp-entra approve {request-id} \
-  --justification "Approved - Verified with manager"
-
-# As requester: Check history to confirm activation
-azp-entra history --days 1
-```
-
-## Using Aliases
-
-Configure aliases in `~/.az-pim-cli/config.yml`:
+### GitHub Actions
 
 ```yaml
-aliases:
-  res:prod:
-    role: "Owner"
-    duration: "PT4H"
-    justification: "Production access"
-    scope: "subscriptions/{prod-sub-id}"
-  
-  entra:emergency:
-    role: "Global Administrator"
-    duration: "PT1H"
-    justification: "Emergency access"
-  
-  groups:oncall:
-    group_id: "{oncall-group-id}"
-    access: "member"
-    duration: "PT12H"
-    justification: "On-call rotation"
+- name: Activate Azure PIM Role
+  run: |
+    az-pim activate deployment-admin \
+      --justification "GitHub Actions deployment - ${{ github.run_id }}"
 ```
 
-Then activate using aliases:
+### Azure DevOps Pipeline
 
-```bash
-# Use resource alias
-azp-res activate prod
-
-# Use Entra role alias
-azp-entra activate emergency
-
-# Use group alias
-azp-groups activate oncall
-```
-
-## Troubleshooting Examples
-
-### DNS Resolution Issues
-
-```bash
-# Enable IPv4-only mode
-export AZ_PIM_IPV4_ONLY=1
-
-# Then retry the command
-azp-res list
-```
-
-### Check Version
-
-```bash
-# Check command versions
-azp-res version
-azp-entra version
-azp-groups version
-```
-
-### Detailed Error Traces
-
-```bash
-# Use verbose mode for troubleshooting
-azp-res list --verbose
-azp-entra activate "{role-id}" --verbose
+```yaml
+- script: |
+    az-pim activate deployment-admin \
+      --justification "Azure Pipeline deployment - $(Build.BuildNumber)"
+  displayName: 'Activate PIM Role'
 ```
 
 ## Tips and Best Practices
 
-1. **Use short durations**: Request only the time you need
-2. **Include justifications**: Make activations auditable
-3. **Use ticket systems**: Link to change/incident tickets when available
-4. **Configure aliases**: Save commonly used roles as aliases
-5. **Check history**: Review past activations for audit purposes
-6. **Verbose logging**: Use `--verbose` when troubleshooting
-7. **Limit results**: Use `--limit` when testing or exploring roles
+1. **Use Short Durations**: Request the minimum time needed
+2. **Provide Specific Justifications**: Include ticket numbers and specific reasons
+3. **Create Role-Specific Aliases**: One alias per common use case
+4. **Review History Regularly**: Check activation patterns with `az-pim history`
+5. **Automate Common Activations**: Use scripts for daily/regular access patterns
+6. **Document Team Aliases**: Share alias configurations with team members
+7. **Use Interactive Mode**: When unsure of role names, use `az-pim list --select` for guided selection
+8. **Activate by Number**: Use role numbers (e.g., `az-pim activate 1`) for faster activation after listing roles
+9. **Combine List and Activate**: Run `az-pim list` first to see all roles with numbers, then activate by number
