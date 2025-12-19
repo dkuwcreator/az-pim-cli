@@ -48,6 +48,11 @@ class Config:
     def _get_default_config(self) -> Dict[str, Any]:
         """
         Get default configuration.
+        
+        Note: In v2.0, aliases require prefixes to identify their command:
+        - 'res:' for resource roles (azp-res)
+        - 'entra:' for Entra directory roles (azp-entra)
+        - 'groups:' for group memberships (azp-groups)
 
         Returns:
             Default configuration dictionary

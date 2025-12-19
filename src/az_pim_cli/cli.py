@@ -119,7 +119,8 @@ def list_resource_roles(
         if not azure_roles:
             console.print("[yellow]No eligible resource roles found.[/yellow]")
             console.print(
-                "[yellow]💡 Tip:[/yellow] Ensure you have Reader + eligible PIM role assignments"
+                "[yellow]💡 Tip:[/yellow] Ensure you have Reader + eligible PIM role "
+                "assignments"
             )
             return
 

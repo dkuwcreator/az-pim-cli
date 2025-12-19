@@ -280,7 +280,7 @@ class PIMClient:
         ticket_system: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Request Azure AD role activation (renamed to Entra role).
+        Request Entra role activation.
 
         Args:
             role_definition_id: Role definition ID
