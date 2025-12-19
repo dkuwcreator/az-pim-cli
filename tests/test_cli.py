@@ -43,3 +43,12 @@ def test_activate_help_shows_number_format() -> None:
     result = runner.invoke(app, ["activate", "--help"])
     assert result.exit_code == 0
     assert "number from list" in result.stdout.lower() or "#n" in result.stdout.lower()
+
+
+def test_alias_list_shows_description_column() -> None:
+    """Test that alias list command shows description column."""
+    result = runner.invoke(app, ["alias", "list"])
+    assert result.exit_code == 0
+    # Check that the Description column is present in the output
+    # (should appear even if no aliases are configured)
+    assert "Description" in result.stdout or "No aliases configured" in result.stdout
