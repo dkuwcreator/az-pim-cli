@@ -69,3 +69,58 @@ def test_default_config(tmp_path: Path) -> None:
 
     default_justification = config.get_default("justification")
     assert default_justification is not None
+
+
+def test_add_alias_with_extended_fields(tmp_path: Path) -> None:
+    """Test adding an alias with extended fields."""
+    config_path = tmp_path / "config.yml"
+    config = Config(config_path)
+
+    config.add_alias(
+        name="extended-alias",
+        role="Contributor",
+        duration="PT4H",
+        justification="Testing",
+        scope="subscription",
+        subscription="12345678-1234-1234-1234-123456789abc",
+        resource="My Resource",
+        resource_type="Microsoft.Compute/virtualMachines",
+        membership="Direct",
+        condition="@Resource[name] StringEquals 'vm1'",
+    )
+
+    alias = config.get_alias("extended-alias")
+    assert alias is not None
+    assert alias["role"] == "Contributor"
+    assert alias["duration"] == "PT4H"
+    assert alias["resource"] == "My Resource"
+    assert alias["resource_type"] == "Microsoft.Compute/virtualMachines"
+    assert alias["membership"] == "Direct"
+    assert alias["condition"] == "@Resource[name] StringEquals 'vm1'"
+
+
+def test_add_alias_without_required_fields(tmp_path: Path) -> None:
+    """Test adding an alias without required fields (should work now)."""
+    config_path = tmp_path / "config.yml"
+    config = Config(config_path)
+
+    # Should not raise an error - validation removed
+    config.add_alias(
+        name="partial-alias",
+        duration="PT8H",
+        justification="Testing partial alias",
+    )
+
+    alias = config.get_alias("partial-alias")
+    assert alias is not None
+    assert alias.get("duration") == "PT8H"
+    assert alias.get("justification") == "Testing partial alias"
+    assert alias.get("role") is None  # Not required anymore
+
+
+def test_get_config_path(tmp_path: Path) -> None:
+    """Test getting config file path."""
+    config_path = tmp_path / "config.yml"
+    config = Config(config_path)
+
+    assert config.get_config_path() == config_path
