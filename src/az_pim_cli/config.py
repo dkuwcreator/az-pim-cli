@@ -88,7 +88,10 @@ class Config:
         Returns:
             Alias configuration or None
         """
-        return self._config.get("aliases", {}).get(name)
+        aliases = self._config.get("aliases", {})
+        if not isinstance(aliases, dict):
+            return None
+        return aliases.get(name)
 
     def add_alias(
         self,
@@ -171,7 +174,11 @@ class Config:
         Returns:
             Dictionary of aliases
         """
-        return self._config.get("aliases", {})
+        aliases = self._config.get("aliases", {})
+        if not isinstance(aliases, dict):
+            return {}
+        # Filter to ensure all values are dicts
+        return {k: v for k, v in aliases.items() if isinstance(v, dict)}
 
     def get_default(self, key: str, fallback: Any | None = None) -> Any | None:
         """

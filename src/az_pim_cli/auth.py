@@ -4,7 +4,9 @@ import base64
 import json
 import os
 import socket
+from collections.abc import Generator
 from contextlib import contextmanager
+from typing import Any
 
 from azure.identity import AzureCliCredential, DefaultAzureCredential
 
@@ -13,7 +15,7 @@ _original_getaddrinfo = socket.getaddrinfo
 
 
 @contextmanager
-def ipv4_only_context():
+def ipv4_only_context() -> Generator[None, None, None]:
     """
     Context manager that temporarily forces IPv4-only DNS resolution.
     This works around DNS resolution issues with IPv6 on some networks.
@@ -24,12 +26,14 @@ def ipv4_only_context():
             response = requests.get(url)
     """
 
-    def _ipv4_only_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+    def _ipv4_only_getaddrinfo(
+        host: str, port: int | str, family: int = 0, type: int = 0, proto: int = 0, flags: int = 0
+    ) -> Any:
         """Force IPv4 resolution to avoid IPv6 DNS issues"""
         return _original_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
 
     original = socket.getaddrinfo
-    socket.getaddrinfo = _ipv4_only_getaddrinfo
+    socket.getaddrinfo = _ipv4_only_getaddrinfo  # type: ignore[assignment]
     try:
         yield
     finally:
@@ -161,7 +165,8 @@ class AzureAuth:
             decoded = base64.urlsafe_b64decode(payload_part)
             claims = json.loads(decoded)
 
-            return claims.get(claim)
+            claim_value = claims.get(claim)
+            return str(claim_value) if claim_value is not None else None
         except Exception:
             return None
 

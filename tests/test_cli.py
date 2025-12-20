@@ -212,24 +212,9 @@ def test_activate_no_role_interactive_search(monkeypatch) -> None:
     import types
 
     import az_pim_cli.cli as cli
+    from az_pim_cli.domain.models import NormalizedRole, RoleSource
 
     captured = {}
-
-    class FakeRole:
-        def __init__(self) -> None:
-            self.id = "role-id"
-            self.name = "Owner"
-            self.scope = "/"
-            self.resource_name = None
-            self.resource_type = None
-            self.membership_type = None
-            self.condition = None
-            self.end_time = None
-            self.is_alias = False
-            self.alias_name = None
-
-        def get_short_scope(self):
-            return "/"
 
     class FakeConfig:
         def __init__(self) -> None:
@@ -286,8 +271,17 @@ def test_activate_no_role_interactive_search(monkeypatch) -> None:
             }
             return {"id": "req-xyz"}
 
-    def fake_normalize(_data, source=None):
-        return [FakeRole()]
+    def fake_normalize(_data, source=None) -> list[NormalizedRole]:
+        return [
+            NormalizedRole(
+                name="Owner",
+                id="role-id",
+                status="Active",
+                scope="/",
+                source=RoleSource.ARM,
+                is_alias=False,
+            )
+        ]
 
     monkeypatch.setattr(cli, "Config", FakeConfig)
     monkeypatch.setattr(cli, "AzureAuth", FakeAuth)
