@@ -426,7 +426,14 @@ If you encounter response parsing errors, this may indicate:
 
 ### Project Architecture
 
-The project follows a simple, focused structure:
+The project follows clean architecture principles with clear separation of concerns.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed design documentation.
+
+**Key Principles:**
+- **Domain Layer**: Pure business logic with no external dependencies
+- **Type Safety**: Strict mypy enforcement ensures correctness
+- **Testability**: Clean separation makes unit testing easier
+- **Maintainability**: Standard tools and well-documented code
 
 ```
 src/az_pim_cli/
@@ -440,10 +447,12 @@ src/az_pim_cli/
 └── exceptions.py    # Backward compatibility re-exports
 ```
 
-**Key Design Principles:**
-- **Domain Layer**: Contains pure business logic with no external dependencies
-- **Simple Structure**: Direct, easy-to-navigate code organization
-- **Backward Compatibility**: Original modules re-export from domain layer for stability
+**Design Benefits:**
+1. **Swappable Components**: HTTP client and config adapters can be replaced
+2. **Type Safety**: Pydantic validation catches configuration errors early
+3. **Testability**: Clean separation makes unit testing easier
+4. **Maintainability**: Clear boundaries reduce coupling
+5. **Backward Compatibility**: Existing code continues to work
 
 ### Setup Development Environment
 
@@ -529,6 +538,10 @@ export AZ_PIM_VERBOSE=true      # Enable verbose logging
 3. **Testability**: Clean separation makes unit testing easier
 4. **Maintainability**: Clear boundaries reduce coupling
 5. **Backward Compatibility**: Existing code continues to work
+
+### Security
+
+See [docs/SECURITY.md](docs/SECURITY.md) for security considerations and best practices.
 
 ## Development
 
