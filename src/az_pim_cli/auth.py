@@ -1,14 +1,14 @@
-"""Authentication module for Azure PIM CLI.
+"""Authentication module for az-pim-cli."""
 
-This module provides backward compatibility by re-exporting from the new auth structure.
-See az_pim_cli.auth.azurecli for the actual implementation.
-"""
+from az_pim_cli.auth.azurecli import AzureAuth, ipv4_only_context, should_use_ipv4_only
 
-# Backward compatibility: re-export from new structure
-from az_pim_cli.auth.azurecli import (
-    AzureAuth,
-    ipv4_only_context,
-    should_use_ipv4_only,
-)
+# Re-export Azure SDK types for backward compatibility with tests
+from azure.identity import AzureCliCredential, DefaultAzureCredential  # noqa: F401
 
-__all__ = ["AzureAuth", "ipv4_only_context", "should_use_ipv4_only"]
+__all__ = [
+    "AzureAuth",
+    "ipv4_only_context",
+    "should_use_ipv4_only",
+    "AzureCliCredential",
+    "DefaultAzureCredential",
+]

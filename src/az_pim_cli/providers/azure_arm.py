@@ -103,18 +103,13 @@ class AzureARMProvider:
                     error_data = response.json() if response.text else {}
                     error_msg = error_data.get("error", {}).get("message", "Insufficient permissions")
                     raise PermissionError(
-                        message=f"Permission denied for {operation}",
+                        message=f"Permission denied for {operation}: {error_msg}",
                         endpoint=url,
-                        principal_id=self.auth.get_user_object_id(),
-                        required_permissions=[
-                            "Microsoft.Authorization/roleEligibilityScheduleInstances/read",
-                            "Microsoft.Authorization/roleAssignmentScheduleRequests/write",
-                        ],
-                        detail=error_msg,
+                        required_permissions="Microsoft.Authorization/roleEligibilityScheduleInstances/read or Microsoft.Authorization/roleAssignmentScheduleRequests/write",
                     )
 
                 response.raise_for_status()
-                return response.json()
+                return response.json()  # type: ignore[no-any-return]
 
             except requests.exceptions.Timeout:
                 raise NetworkError(

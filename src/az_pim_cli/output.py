@@ -8,7 +8,6 @@ Reference:
 - https://rich.readthedocs.io/en/stable/introduction.html
 """
 
-from typing import Any
 
 from rich.console import Console
 from rich.panel import Panel

@@ -102,18 +102,13 @@ class EntraGraphProvider:
                     error_data = response.json() if response.text else {}
                     error_msg = error_data.get("error", {}).get("message", "Insufficient permissions")
                     raise PermissionError(
-                        message=f"Permission denied for {operation}",
+                        message=f"Permission denied for {operation}: {error_msg}",
                         endpoint=url,
-                        principal_id=self.auth.get_user_object_id(),
-                        required_permissions=[
-                            "RoleManagement.ReadWrite.Directory",
-                            "RoleAssignmentSchedule.ReadWrite.Directory",
-                        ],
-                        detail=error_msg,
+                        required_permissions="RoleManagement.ReadWrite.Directory or RoleAssignmentSchedule.ReadWrite.Directory",
                     )
 
                 response.raise_for_status()
-                return response.json()
+                return response.json()  # type: ignore[no-any-return]
 
             except requests.exceptions.Timeout:
                 raise NetworkError(
@@ -307,7 +302,7 @@ class EntraGraphProvider:
             "GET", url, params, operation="list pending Entra role approvals"
         )
 
-        return data.get("value", [])
+        return data.get("value", [])  # type: ignore[no-any-return]
 
     def approve_request(
         self, request_id: str, justification: str = "Approved via az-pim-cli"

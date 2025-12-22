@@ -177,3 +177,68 @@ class AzureAuth:
             return str(claims.get("tid", ""))
         except Exception as e:
             raise AuthenticationError("Failed to get tenant ID from token") from e
+
+    def _extract_token_claim(self, scope: str, claim: str) -> str | None:
+        """
+        Extract a claim from the JWT token payload.
+
+        Args:
+            scope: The scope for the access token
+            claim: The claim name to extract (e.g., 'oid', 'tid')
+
+        Returns:
+            The claim value or None if not found
+        """
+        try:
+            token = self.get_token(scope)
+            payload_part = token.split(".")[1]
+
+            # Add padding if needed (JWT base64 may not be padded)
+            padding = len(payload_part) % 4
+            if padding:
+                payload_part += "=" * (4 - padding)
+
+            decoded = base64.urlsafe_b64decode(payload_part)
+            claims = json.loads(decoded)
+
+            claim_value = claims.get(claim)
+            return str(claim_value) if claim_value is not None else None
+        except Exception:
+            return None
+
+    def get_subscription_id(self) -> str:
+        """
+        Get the current subscription ID.
+
+        Returns:
+            Subscription ID string
+
+        Raises:
+            RuntimeError: If subscription ID cannot be determined
+        """
+        # Try to get from token claims (some tokens include this)
+        subscription_id = self._extract_token_claim(
+            "https://management.azure.com/.default", "subscriptionId"
+        )
+
+        if subscription_id:
+            return subscription_id
+
+        # If not in token, we need to query the Azure SDK
+        # Use the subscription context from the credential
+        try:
+            from azure.mgmt.subscription import SubscriptionClient
+
+            credential = self._get_credential()
+            client = SubscriptionClient(credential)
+
+            for subscription in client.subscriptions.list():
+                if subscription.subscription_id:
+                    return subscription.subscription_id
+
+            raise RuntimeError("No subscriptions found for the authenticated user")
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to determine subscription ID: {str(e)}. "
+                "Ensure you have selected a subscription with 'az account set --subscription <sub>'."
+            )
