@@ -1174,20 +1174,25 @@ def approve_request(
 ) -> None:
     """Approve a pending role activation request."""
     try:
+        from az_pim_cli import ui
+
         auth = AzureAuth()
         client = PIMClient(auth)
 
         justification = justification or "Approved via az-pim-cli"
 
-        console.print(f"\n[bold blue]Approving request:[/bold blue] {request_id}")
-        console.print(f"[blue]Justification:[/blue] {justification}\n")
+        ui.section("Approving Request")
+        ui.print_key_value("Request ID", request_id)
+        ui.print_key_value("Justification", justification)
+        console.print()
 
         client.approve_request(request_id, justification)
 
-        console.print("[bold green]✓ Request approved successfully![/bold green]")
+        ui.success("Request approved successfully!")
 
     except Exception as e:
-        console.print(f"[bold red]Error:[/bold red] {str(e)}")
+        from az_pim_cli import ui
+        ui.error(f"Failed to approve request: {str(e)}")
         raise typer.Exit(1)
 
 
@@ -1479,35 +1484,37 @@ def whoami(
 ) -> None:
     """Show current Azure identity and authentication information."""
     try:
+        from az_pim_cli import ui
+
         auth = AzureAuth()
 
-        console.print("\n[bold cyan]🔐 Azure Identity Information[/bold cyan]\n")
+        ui.section("🔐 Azure Identity Information")
 
         # Get tenant ID
         try:
             tenant_id = auth.get_tenant_id()
-            console.print(f"[bold]Tenant ID:[/bold] [green]{tenant_id}[/green]")
+            ui.print_key_value("Tenant ID", tenant_id, value_style="green")
         except Exception as e:
-            console.print(f"[bold]Tenant ID:[/bold] [red]Unable to retrieve ({str(e)})[/red]")
+            ui.print_key_value("Tenant ID", f"Unable to retrieve ({str(e)})", value_style="red")
 
         # Get user object ID
         try:
             user_id = auth.get_user_object_id()
-            console.print(f"[bold]User Object ID:[/bold] [green]{user_id}[/green]")
+            ui.print_key_value("User Object ID", user_id, value_style="green")
         except Exception as e:
-            console.print(f"[bold]User Object ID:[/bold] [red]Unable to retrieve ({str(e)})[/red]")
+            ui.print_key_value("User Object ID", f"Unable to retrieve ({str(e)})", value_style="red")
 
         # Get subscription ID
         try:
             subscription_id = auth.get_subscription_id()
-            console.print(f"[bold]Current Subscription:[/bold] [green]{subscription_id}[/green]")
+            ui.print_key_value("Current Subscription", subscription_id, value_style="green")
         except Exception as e:
-            console.print(
-                f"[bold]Current Subscription:[/bold] [yellow]Not available ({str(e)})[/yellow]"
-            )
+            ui.print_key_value("Current Subscription", f"Not available ({str(e)})", value_style="yellow")
+
+        ui.separator()
 
         # Show auth mode
-        console.print("\n[bold]Authentication Mode:[/bold] [cyan]Azure CLI Credential[/cyan]")
+        ui.print_key_value("Authentication Mode", "Azure CLI Credential")
         console.print(
             "[dim]Using Azure CLI login (az login). "
             "Fallback to DefaultAzureCredential if Azure CLI is not available.[/dim]"
@@ -1515,14 +1522,15 @@ def whoami(
 
         # Show IPv4-only mode
         if should_use_ipv4_only():
-            console.print("\n[bold]Network Mode:[/bold] [yellow]IPv4-only mode enabled[/yellow]")
+            ui.print_key_value("Network Mode", "IPv4-only mode enabled", value_style="yellow")
 
         # Show backend
         backend = os.environ.get("AZ_PIM_BACKEND", DEFAULT_BACKEND)
-        console.print(f"[bold]Backend:[/bold] [cyan]{backend}[/cyan]")
+        ui.print_key_value("Backend", backend)
 
         if verbose:
-            console.print("\n[bold cyan]Token Validation:[/bold cyan]")
+            ui.separator()
+            ui.section("Token Validation", style="bold cyan")
             try:
                 # Validate Graph token availability
                 auth.get_token("https://graph.microsoft.com/.default")
@@ -1540,27 +1548,26 @@ def whoami(
         console.print()
 
     except AuthenticationError as e:
-        console.print(f"\n[red]✗ Authentication failed: {str(e)}[/red]")
-        if hasattr(e, "suggestion") and e.suggestion:
-            console.print(f"[yellow]Suggestion: {e.suggestion}[/yellow]\n")
+        from az_pim_cli import ui
+        ui.error(f"Authentication failed: {str(e)}", detail=e.suggestion if hasattr(e, "suggestion") and e.suggestion else None)
         raise typer.Exit(1)
     except Exception as e:
-        console.print(f"\n[red]✗ Error: {str(e)}[/red]\n")
-        if verbose:
-            import traceback
+        import traceback
 
-            console.print(f"[dim]{traceback.format_exc()}[/dim]")
+        from az_pim_cli import ui
+        detail = traceback.format_exc() if verbose else None
+        ui.error(f"Error: {str(e)}", detail=detail)
         raise typer.Exit(1)
 
 
 @app.command("version")
 def version() -> None:
     """Show version information."""
-    from az_pim_cli import __version__
+    from az_pim_cli import __version__, ui
 
-    console.print(
-        f"[bold blue]az-pim-cli[/bold blue] version [bold green]{__version__}[/bold green]"
-    )
+    ui.section("📦 Version Information")
+    ui.print_key_value("az-pim-cli", __version__, value_style="green bold")
+    console.print()
 
 
 if __name__ == "__main__":
