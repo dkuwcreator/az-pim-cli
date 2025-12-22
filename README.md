@@ -12,7 +12,12 @@ A lightweight Python + Typer CLI for Azure Privileged Identity Management (PIM).
 - 📊 **History Tracking**: View activation history
 - 🏷️ **Aliases**: Define custom aliases with preset duration, justification, and scope
 - 🔑 **Flexible Auth**: Uses Azure CLI credentials or MSAL for authentication
-- 🎨 **Rich UI**: Beautiful terminal output with tables and colors
+- 🎨 **Rich UI**: Beautiful terminal output with colors, tables, panels, and progress bars
+- 🤖 **Interactive Mode**: Guided prompts with validation (opt-in via `--interactive/-i`)
+- ⏳ **Progress Indicators**: Status spinners and progress bars for long operations
+- 📋 **Enhanced Tables**: Consistent, readable table formatting with Rich
+- 💡 **Built-in Tips**: `az-pim tips` for quick help and best practices
+- 📺 **Optional Dashboard**: Full-screen TUI with Textual (install with `[tui]` extra)
 - 💾 **Smart Caching**: Caches role lookups to minimize API calls
 
 ## Installation
@@ -35,12 +40,26 @@ pip install az-pim-cli[fuzzy]
 
 This installs `rapidfuzz` for faster and more accurate fuzzy matching.
 
+### Optional: Interactive Dashboard
+
+For the full-screen TUI dashboard:
+
+```bash
+pip install az-pim-cli[tui]
+```
+
+This installs `textual` for the interactive dashboard (`az-pim dashboard`).
+
 ### From PyPI (coming soon)
 
 ```bash
 pip install az-pim-cli
 # Or with fuzzy matching support
 pip install az-pim-cli[fuzzy]
+# Or with TUI dashboard
+pip install az-pim-cli[tui]
+# Or with all extras
+pip install az-pim-cli[fuzzy,tui]
 ```
 
 ## Prerequisites
@@ -155,6 +174,41 @@ defaults:
 ```
 
 See [EXAMPLES.md](docs/EXAMPLES.md#smart-input-resolution) for more details.
+
+### Interactive Mode
+
+Enable guided prompts with validation using the `--interactive` (or `-i`) flag:
+
+```bash
+# Activate with interactive prompts
+az-pim activate --interactive
+
+# Interactive mode with specific role
+az-pim activate "Owner" --interactive
+
+# Works even in non-TTY environments (e.g., scripts with input)
+echo -e "8\nDeployment" | az-pim activate --interactive
+```
+
+**Features of Interactive Mode:**
+- Guided prompts for missing options (duration, justification, scope)
+- Input validation with helpful error messages
+- Numbered choices for role selection
+- Backward compatible: TTY auto-detection still works
+- Opt-in for scripts: only prompts when `--interactive` is set
+
+**Built-in Help Commands:**
+
+```bash
+# Show tips and best practices
+az-pim tips
+
+# View recent changelog
+az-pim changelog
+
+# Launch interactive dashboard (requires 'tui' extra)
+az-pim dashboard
+```
 
 ### Approve Requests
 
