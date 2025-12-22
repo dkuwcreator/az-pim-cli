@@ -152,11 +152,10 @@ class AzureAuth:
         from az_pim_cli.exceptions import AuthenticationError
 
         try:
-            token = self.get_token("https://graph.microsoft.com/.default")
-            payload = token.split(".")[1]
-            payload += "=" * (4 - len(payload) % 4)
-            claims = json.loads(base64.b64decode(payload))
-            return str(claims.get("oid", ""))
+            oid = self._extract_token_claim("https://graph.microsoft.com/.default", "oid")
+            if oid:
+                return oid
+            raise ValueError("oid claim not found in token")
         except Exception as e:
             raise AuthenticationError("Failed to get user object ID from token") from e
 
@@ -173,11 +172,10 @@ class AzureAuth:
         from az_pim_cli.exceptions import AuthenticationError
 
         try:
-            token = self.get_token("https://graph.microsoft.com/.default")
-            payload = token.split(".")[1]
-            payload += "=" * (4 - len(payload) % 4)
-            claims = json.loads(base64.b64decode(payload))
-            return str(claims.get("tid", ""))
+            tid = self._extract_token_claim("https://graph.microsoft.com/.default", "tid")
+            if tid:
+                return tid
+            raise ValueError("tid claim not found in token")
         except Exception as e:
             raise AuthenticationError("Failed to get tenant ID from token") from e
 
@@ -191,6 +189,12 @@ class AzureAuth:
 
         Returns:
             The claim value or None if not found
+
+        Note:
+            This method decodes the JWT payload without signature verification.
+            Signature verification is handled by Azure SDK during token acquisition,
+            so tokens obtained through get_token() are already validated.
+            We only decode here to extract identity claims for informational purposes.
         """
         try:
             token = self.get_token(scope)
@@ -201,6 +205,7 @@ class AzureAuth:
             if padding:
                 payload_part += "=" * (4 - padding)
 
+            # Decode payload without signature verification (already verified by Azure SDK)
             decoded = base64.urlsafe_b64decode(payload_part)
             claims = json.loads(decoded)
 

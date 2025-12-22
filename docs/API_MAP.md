@@ -13,6 +13,27 @@ The CLI supports two backends:
 
 ## Authentication & Identity
 
+### Show Current Identity (whoami)
+
+**Command**: `az-pim whoami`
+
+**Description**: Displays current Azure identity information including tenant ID, user object ID, subscription ID, and authentication mode.
+
+**APIs Used**:
+- Token introspection (extracting claims from JWT)
+- Azure CLI credential chain
+- Subscription context from Azure SDK
+
+**Scope**: 
+- `https://graph.microsoft.com/.default` (for token validation)
+- `https://management.azure.com/.default` (for subscription info)
+
+**Permissions Required**: None (read-only identity information)
+
+**Reference**: Internal authentication methods
+
+---
+
 ### Get Current User Info
 
 **Endpoint**: `GET https://graph.microsoft.com/v1.0/me`
@@ -371,10 +392,9 @@ When a 403 error occurs, the error message should include:
 
 Commands planned for future iterations:
 
-- `az-pim whoami` - Show tenant, account, auth mode
-- `az-pim entra eligible` - List eligible Entra roles (explicit command)
+- `az-pim entra eligible` - List eligible Entra roles (explicit command, currently via `az-pim list`)
 - `az-pim entra active` - List active Entra assignments
-- `az-pim azure activate --scope <sub|rg|resource> --role <role>` - Explicit Azure resource activation
-- `az-pim entra approvals list` - List pending approvals (explicit)
-- `az-pim entra approvals approve <request-id>` - Approve request
+- `az-pim azure activate --scope <sub|rg|resource> --role <role>` - Explicit Azure resource activation (currently via `az-pim activate --resource`)
+- `az-pim entra approvals list` - List pending approvals (explicit command, currently via `az-pim pending`)
+- `az-pim entra approvals approve <request-id>` - Approve request (currently via `az-pim approve`)
 - `az-pim entra approvals deny <request-id>` - Deny request
