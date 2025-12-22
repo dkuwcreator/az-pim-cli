@@ -394,3 +394,11 @@ def test_activate_no_role_interactive_search(monkeypatch) -> None:
     assert captured["payload"]["role_definition_id"] == "role-id"
     assert captured["payload"]["duration"] == "PT1H"
     assert captured["payload"]["justification"] == "Default just"
+
+
+def test_activate_help_shows_interactive_flag() -> None:
+    """Test that activate help shows interactive flag."""
+    result = runner.invoke(app, ["activate", "--help"])
+    assert result.exit_code == 0
+    assert "--interactive" in result.stdout or "-i" in result.stdout
+    assert "interactive mode" in result.stdout.lower() or "guided prompts" in result.stdout.lower()

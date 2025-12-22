@@ -483,8 +483,15 @@ def activate_role(
     ticket: str | None = typer.Option(None, "--ticket", "-t", help="Ticket number"),
     ticket_system: str | None = typer.Option(None, "--ticket-system", help="Ticket system name"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
+    interactive: bool = typer.Option(
+        False, "--interactive", "-i", help="Enable interactive mode with guided prompts (opt-in)"
+    ),
 ) -> None:
-    """Activate a role."""
+    """Activate a role.
+
+    Interactive mode (--interactive/-i) provides guided prompts and validation for all required fields.
+    Non-interactive mode (default) preserves existing behavior for scripts and CI/CD.
+    """
     try:
         from az_pim_cli.models import alias_to_normalized_role
 
@@ -495,11 +502,22 @@ def activate_role(
         role_id: str | None = None
         role_input: str | None = role
 
-        def is_interactive() -> bool:
+        def is_interactive_mode() -> bool:
+            """Check if interactive mode is enabled (opt-in via --interactive flag or TTY detection)."""
             try:
-                return sys.stdin.isatty()
+                # Interactive mode is opt-in via --interactive flag
+                # OR automatically enabled if in TTY (legacy behavior for backward compatibility)
+                return interactive or sys.stdin.isatty()
             except Exception:
-                return False
+                return interactive
+
+        def should_prompt() -> bool:
+            """Check if we should prompt the user (--interactive flag OR in a TTY)."""
+            try:
+                # Allow prompting if interactive flag is set OR in a TTY (backward compatibility)
+                return interactive or sys.stdin.isatty()
+            except Exception:
+                return interactive
 
         def ensure_scope(current_scope: str | None) -> str:
             """Ensure a valid scope is provided, prompting if necessary."""
@@ -510,7 +528,7 @@ def activate_role(
 
             default_sub = auth.get_subscription_id()
             default_scope = f"subscriptions/{default_sub}"
-            if is_interactive():
+            if should_prompt():
                 result = typer.prompt("Enter scope", default=default_scope)
                 return str(result) if result else default_scope
             return default_scope
@@ -519,7 +537,7 @@ def activate_role(
             if (ticket and ticket_system) or (not ticket and not ticket_system):
                 return ticket, ticket_system
 
-            if not is_interactive():
+            if not should_prompt():
                 # Non-interactive: don't surprise with prompts; ignore incomplete ticket info.
                 return None, None
 
@@ -618,7 +636,7 @@ def activate_role(
 
         # If no role was provided, run interactive picker (TTY only)
         if role_input is None:
-            if not is_interactive():
+            if not is_interactive_mode():
                 console.print("[red]Role name or ID is required in non-interactive mode.[/red]")
                 raise typer.Exit(1)
 
@@ -900,7 +918,7 @@ def activate_role(
             role_id = alias.get("role")
             if not role_id:
                 console.print("[yellow]Alias is missing 'role' field.[/yellow]")
-                if is_interactive():
+                if should_prompt():
                     role_id = typer.prompt("Enter role name or ID")
                 else:
                     console.print(
@@ -920,7 +938,7 @@ def activate_role(
                     subscription = alias.get("subscription")
                     if not subscription:
                         # Prompt for subscription if missing (TTY) or use current subscription (non-TTY)
-                        if is_interactive():
+                        if should_prompt():
                             subscription = typer.prompt(
                                 "Enter subscription ID", default=auth.get_subscription_id()
                             )
@@ -938,7 +956,7 @@ def activate_role(
                     "[yellow]Resource scope is required for resource role activation.[/yellow]"
                 )
                 default_sub = auth.get_subscription_id()
-                if is_interactive():
+                if should_prompt():
                     scope = typer.prompt("Enter scope", default=f"subscriptions/{default_sub}")
                 else:
                     scope = f"subscriptions/{default_sub}"
@@ -981,7 +999,7 @@ def activate_role(
                 role_id = resolved_role.id
 
         # Prompt for missing required inputs with defaults implied by TTY
-        if is_interactive() and duration is None:
+        if should_prompt() and duration is None:
             # Suggest default duration from config (e.g., PT8H) or fallback to 8 hours
             default_dur = parse_duration_from_alias(config.get_default("duration")) or 8.0
             dur_input = typer.prompt("Enter duration (hours)", default=str(int(default_dur)))
@@ -993,7 +1011,7 @@ def activate_role(
                 )
                 raise typer.Exit(1)
 
-        if is_interactive() and not justification:
+        if should_prompt() and not justification:
             default_just = config.get_default("justification") or "Requested via az-pim-cli"
             justification = typer.prompt("Enter justification", default=default_just)
 
