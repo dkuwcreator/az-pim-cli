@@ -1592,5 +1592,21 @@ def version() -> None:
     console.print()
 
 
+@app.command("tips")
+def show_tips() -> None:
+    """Show tips and best practices for using az-pim-cli."""
+    from az_pim_cli import helptext
+
+    helptext.show_tips()
+
+
+@app.command("changelog")
+def show_changelog() -> None:
+    """Show recent changelog highlights."""
+    from az_pim_cli import helptext
+
+    helptext.show_changelog_highlights()
+
+
 if __name__ == "__main__":
     app()

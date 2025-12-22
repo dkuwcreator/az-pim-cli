@@ -402,3 +402,17 @@ def test_activate_help_shows_interactive_flag() -> None:
     assert result.exit_code == 0
     assert "--interactive" in result.stdout or "-i" in result.stdout
     assert "interactive mode" in result.stdout.lower() or "guided prompts" in result.stdout.lower()
+
+
+def test_tips_command() -> None:
+    """Test tips command."""
+    result = runner.invoke(app, ["tips"])
+    assert result.exit_code == 0
+    assert "Tips" in result.stdout or "tips" in result.stdout
+
+
+def test_changelog_command() -> None:
+    """Test changelog command."""
+    result = runner.invoke(app, ["changelog"])
+    assert result.exit_code == 0
+    assert "Version" in result.stdout or "version" in result.stdout or "Changes" in result.stdout
