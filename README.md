@@ -472,6 +472,25 @@ The project uses modern Python tooling:
 - **mypy**: Static type checking with strict mode
 - **pytest**: Testing framework with coverage
 - **pre-commit**: Automated code quality checks
+- **make**: Convenient command shortcuts
+
+### Quick Start: Smoke Test
+
+Before making changes, run the smoke test to verify your development environment:
+
+```bash
+# Using make
+make smoke
+
+# Or directly
+python scripts/smoke_test.py
+```
+
+The smoke test validates:
+- ✓ Azure authentication is working
+- ✓ Graph API connectivity
+- ✓ Basic PIM role retrieval
+- ✓ Rich output formatting
 
 ### Run Tests
 
@@ -500,6 +519,11 @@ mypy src/
 
 # Run pre-commit hooks manually
 pre-commit run --all-files
+
+# Or use make shortcuts
+make lint
+make format
+make typecheck
 ```
 
 ### Configuration Options
@@ -554,6 +578,15 @@ See [docs/SECURITY.md](docs/SECURITY.md) for security considerations and best pr
 Contributions are welcome! Please feel free to submit a Pull Request.
 
 See [CHANGELOG.md](CHANGELOG.md) for recent changes and [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
+
+### Documentation
+
+- **[API_MAP.md](docs/API_MAP.md)** - Complete API endpoint mapping for all commands
+- **[PERMISSIONS.md](docs/PERMISSIONS.md)** - Required permissions for each command
+- **[adr/0001-auth.md](docs/adr/0001-auth.md)** - Authentication strategy and decision record
+- **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** - Project architecture and design
+- **[SECURITY.md](docs/SECURITY.md)** - Security considerations
+- **[EXAMPLES.md](docs/EXAMPLES.md)** - Usage examples
 
 ## License
 
