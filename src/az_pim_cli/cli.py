@@ -505,19 +505,17 @@ def activate_role(
         role_id: str | None = None
         role_input: str | None = role
 
-        def is_interactive_mode() -> bool:
-            """Check if interactive mode is enabled (opt-in via --interactive flag or TTY detection)."""
-            try:
-                # Interactive mode is opt-in via --interactive flag
-                # OR automatically enabled if in TTY (legacy behavior for backward compatibility)
-                return interactive or sys.stdin.isatty()
-            except Exception:
-                return interactive
-
         def should_prompt() -> bool:
-            """Check if we should prompt the user (--interactive flag OR in a TTY)."""
+            """
+            Check if we should prompt the user.
+
+            Returns True if:
+            - The --interactive flag is set, OR
+            - Running in a TTY (for backward compatibility)
+
+            This maintains backward compatibility while allowing explicit opt-in.
+            """
             try:
-                # Allow prompting if interactive flag is set OR in a TTY (backward compatibility)
                 return interactive or sys.stdin.isatty()
             except Exception:
                 return interactive
@@ -639,7 +637,7 @@ def activate_role(
 
         # If no role was provided, run interactive picker (TTY only)
         if role_input is None:
-            if not is_interactive_mode():
+            if not should_prompt():
                 console.print("[red]Role name or ID is required in non-interactive mode.[/red]")
                 raise typer.Exit(1)
 

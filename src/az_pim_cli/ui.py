@@ -123,16 +123,16 @@ def status_badge(text: str, *, status: str = "info") -> Text:
         Rich Text object with styled badge
     """
     status_styles = {
-        "info": ("blue", "on blue"),
-        "success": ("green", "on green"),
-        "warning": ("yellow", "on yellow"),
-        "error": ("red", "on red"),
-        "active": ("green", "on green"),
-        "inactive": ("dim", "on dim"),
+        "info": "blue",
+        "success": "green",
+        "warning": "yellow",
+        "error": "red",
+        "active": "green",
+        "inactive": "dim",
     }
 
-    fg_style, bg_style = status_styles.get(status, status_styles["info"])
-    badge = Text(f" {text} ", style=f"bold {fg_style}")
+    style_color = status_styles.get(status, status_styles["info"])
+    badge = Text(f" {text} ", style=f"bold {style_color}")
     return badge
 
 
