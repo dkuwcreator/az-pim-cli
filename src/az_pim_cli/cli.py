@@ -1469,6 +1469,88 @@ def edit_alias(name: str = typer.Argument(..., help="Alias name to edit")) -> No
         raise typer.Exit(1)
 
 
+@app.command("whoami")
+def whoami(
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output")
+) -> None:
+    """Show current Azure identity and authentication information."""
+    try:
+        auth = AzureAuth()
+
+        console.print("\n[bold cyan]🔐 Azure Identity Information[/bold cyan]\n")
+
+        # Get tenant ID
+        try:
+            tenant_id = auth.get_tenant_id()
+            console.print(f"[bold]Tenant ID:[/bold] [green]{tenant_id}[/green]")
+        except Exception as e:
+            console.print(f"[bold]Tenant ID:[/bold] [red]Unable to retrieve ({str(e)})[/red]")
+
+        # Get user object ID
+        try:
+            user_id = auth.get_user_object_id()
+            console.print(f"[bold]User Object ID:[/bold] [green]{user_id}[/green]")
+        except Exception as e:
+            console.print(f"[bold]User Object ID:[/bold] [red]Unable to retrieve ({str(e)})[/red]")
+
+        # Get subscription ID
+        try:
+            subscription_id = auth.get_subscription_id()
+            console.print(f"[bold]Current Subscription:[/bold] [green]{subscription_id}[/green]")
+        except Exception as e:
+            console.print(
+                f"[bold]Current Subscription:[/bold] [yellow]Not available ({str(e)})[/yellow]"
+            )
+
+        # Show auth mode
+        console.print("\n[bold]Authentication Mode:[/bold] [cyan]Azure CLI Credential[/cyan]")
+        console.print(
+            "[dim]Using Azure CLI login (az login). "
+            "Fallback to DefaultAzureCredential if Azure CLI is not available.[/dim]"
+        )
+
+        # Show IPv4-only mode
+        ipv4_mode = os.environ.get("AZ_PIM_IPV4_ONLY", "")
+        if ipv4_mode:
+            console.print(
+                "\n[bold]Network Mode:[/bold] [yellow]IPv4-only mode enabled[/yellow]"
+            )
+
+        # Show backend
+        backend = os.environ.get("AZ_PIM_BACKEND", "ARM")
+        console.print(f"[bold]Backend:[/bold] [cyan]{backend}[/cyan]")
+
+        if verbose:
+            console.print("\n[bold cyan]Token Information:[/bold cyan]")
+            try:
+                # Get Graph token
+                graph_token = auth.get_token("https://graph.microsoft.com/.default")
+                console.print(f"[dim]Graph API token acquired (length: {len(graph_token)})[/dim]")
+            except Exception as e:
+                console.print(f"[dim]Graph API token: [red]Failed ({str(e)})[/red][/dim]")
+
+            try:
+                # Get ARM token
+                arm_token = auth.get_token("https://management.azure.com/.default")
+                console.print(f"[dim]ARM API token acquired (length: {len(arm_token)})[/dim]")
+            except Exception as e:
+                console.print(f"[dim]ARM API token: [red]Failed ({str(e)})[/red][/dim]")
+
+        console.print()
+
+    except AuthenticationError as e:
+        console.print(f"\n[red]✗ Authentication failed: {str(e)}[/red]")
+        if hasattr(e, "suggestion") and e.suggestion:
+            console.print(f"[yellow]Suggestion: {e.suggestion}[/yellow]\n")
+        raise typer.Exit(1)
+    except Exception as e:
+        console.print(f"\n[red]✗ Error: {str(e)}[/red]\n")
+        if verbose:
+            import traceback
+            console.print(f"[dim]{traceback.format_exc()}[/dim]")
+        raise typer.Exit(1)
+
+
 @app.command("version")
 def version() -> None:
     """Show version information."""
