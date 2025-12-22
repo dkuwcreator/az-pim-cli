@@ -51,6 +51,9 @@ http = [
     "httpx>=0.28.0",
     "tenacity>=9.0.0",
 ]
+tui = [
+    "textual>=1.0.0",
+]
 
 [project.scripts]
 az-pim = "az_pim_cli.cli:app"
@@ -102,6 +105,7 @@ disallow_any_generics = false
 module = [
     "azure.*",
     "rapidfuzz.*",
+    "textual.*",
 ]
 ignore_missing_imports = true
 

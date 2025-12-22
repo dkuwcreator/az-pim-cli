@@ -12,7 +12,12 @@ A lightweight Python + Typer CLI for Azure Privileged Identity Management (PIM).
 - 📊 **History Tracking**: View activation history
 - 🏷️ **Aliases**: Define custom aliases with preset duration, justification, and scope
 - 🔑 **Flexible Auth**: Uses Azure CLI credentials or MSAL for authentication
-- 🎨 **Rich UI**: Beautiful terminal output with tables and colors
+- 🎨 **Rich UI**: Beautiful terminal output with colors, tables, panels, and progress bars
+- 🤖 **Interactive Prompts**: Guided prompts with validation for missing fields
+- ⏳ **Progress Indicators**: Status spinners and progress bars for long operations
+- 📋 **Enhanced Tables**: Consistent, readable table formatting with Rich
+- 💡 **Built-in Tips**: `az-pim tips` for quick help and best practices
+- 📺 **Optional Dashboard**: Full-screen TUI with Textual (install with `[tui]` extra)
 - 💾 **Smart Caching**: Caches role lookups to minimize API calls
 
 ## Installation
@@ -35,12 +40,26 @@ pip install az-pim-cli[fuzzy]
 
 This installs `rapidfuzz` for faster and more accurate fuzzy matching.
 
+### Optional: Interactive Dashboard
+
+For the full-screen TUI dashboard:
+
+```bash
+pip install az-pim-cli[tui]
+```
+
+This installs `textual` for the interactive dashboard (`az-pim dashboard`).
+
 ### From PyPI (coming soon)
 
 ```bash
 pip install az-pim-cli
 # Or with fuzzy matching support
 pip install az-pim-cli[fuzzy]
+# Or with TUI dashboard
+pip install az-pim-cli[tui]
+# Or with all extras
+pip install az-pim-cli[fuzzy,tui]
 ```
 
 ## Prerequisites
@@ -155,6 +174,37 @@ defaults:
 ```
 
 See [EXAMPLES.md](docs/EXAMPLES.md#smart-input-resolution) for more details.
+
+### Interactive Prompts
+
+The CLI provides guided prompts with validation for missing required fields:
+
+```bash
+# Activate a role - will prompt for missing options
+az-pim activate "Owner"
+
+# Prompts for duration, justification, and other missing fields
+# Provides sensible defaults from config
+```
+
+**Features:**
+- Guided prompts for missing options (duration, justification, scope)
+- Input validation with helpful error messages
+- Numbered choices for role selection
+- Always enabled for a better user experience
+
+**Built-in Help Commands:**
+
+```bash
+# Show tips and best practices
+az-pim tips
+
+# View recent changelog
+az-pim changelog
+
+# Launch interactive dashboard (requires 'tui' extra)
+az-pim dashboard
+```
 
 ### Approve Requests
 
@@ -443,8 +493,8 @@ src/az_pim_cli/
 ├── resolver.py      # Input resolution logic
 ├── auth.py          # Authentication
 ├── config.py        # Configuration management
-├── models.py        # Backward compatibility re-exports
-└── exceptions.py    # Backward compatibility re-exports
+├── models.py        # Domain model re-exports
+└── exceptions.py    # Domain exception re-exports
 ```
 
 **Design Benefits:**
@@ -452,7 +502,6 @@ src/az_pim_cli/
 2. **Type Safety**: Pydantic validation catches configuration errors early
 3. **Testability**: Clean separation makes unit testing easier
 4. **Maintainability**: Clear boundaries reduce coupling
-5. **Backward Compatibility**: Existing code continues to work
 
 ### Setup Development Environment
 
@@ -561,7 +610,6 @@ export AZ_PIM_VERBOSE=true      # Enable verbose logging
 2. **Type Safety**: Pydantic validation catches configuration errors early
 3. **Testability**: Clean separation makes unit testing easier
 4. **Maintainability**: Clear boundaries reduce coupling
-5. **Backward Compatibility**: Existing code continues to work
 
 ### Security
 

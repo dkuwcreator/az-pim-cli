@@ -1,15 +1,14 @@
 """Main CLI module for Azure PIM CLI."""
 
 import os
-import sys
 from typing import Any
 
 import typer
-from rich.console import Console
 from rich.table import Table
 
 from az_pim_cli.auth import AzureAuth, should_use_ipv4_only
 from az_pim_cli.config import Config
+from az_pim_cli.console import console, install_traceback
 from az_pim_cli.domain.models import NormalizedRole
 from az_pim_cli.exceptions import (
     AuthenticationError,
@@ -25,6 +24,9 @@ from az_pim_cli.models import (
 from az_pim_cli.pim_client import PIMClient
 from az_pim_cli.resolver import InputResolver, resolve_role
 
+# Install Rich tracebacks for beautiful error displays
+install_traceback(show_locals=False)
+
 # Default backend for PIM operations
 DEFAULT_BACKEND = "ARM"
 
@@ -33,8 +35,6 @@ app = typer.Typer(
     help="Azure PIM CLI - Manage Azure Privileged Identity Management roles",
     no_args_is_help=True,
 )
-
-console = Console()
 
 
 def get_resolver(config: Config, is_tty: bool | None = None) -> InputResolver:
@@ -226,27 +226,30 @@ def list_roles(
 ) -> None:
     """List eligible roles."""
     try:
+        from az_pim_cli import ops
         from az_pim_cli.models import alias_to_normalized_role
 
         auth = AzureAuth()
         client = PIMClient(auth, verbose=verbose)
         config = Config()
 
-        console.print("[bold blue]Fetching eligible roles...[/bold blue]")
+        with ops.status("Fetching eligible roles..."):
+            if resource:
+                if not scope:
+                    # Default to current subscription
+                    subscription_id = auth.get_subscription_id()
+                    scope = f"subscriptions/{subscription_id}"
+                else:
+                    # Resolve scope input to full path
+                    scope = resolve_scope_input(scope, auth, client, config)
+
+                roles_data = client.list_resource_role_assignments(scope, limit=limit)
+            else:
+                roles_data = client.list_role_assignments(limit=limit)
 
         if resource:
-            if not scope:
-                # Default to current subscription
-                subscription_id = auth.get_subscription_id()
-                scope = f"subscriptions/{subscription_id}"
-            else:
-                # Resolve scope input to full path
-                scope = resolve_scope_input(scope, auth, client, config)
-
-            roles_data = client.list_resource_role_assignments(scope, limit=limit)
             console.print(f"\n[bold green]Eligible Resource Roles (Scope: {scope})[/bold green]")
         else:
-            roles_data = client.list_role_assignments(limit=limit)
             console.print("\n[bold green]Eligible Azure AD Roles[/bold green]")
 
         # Show backend info in verbose mode
@@ -469,7 +472,7 @@ def list_roles(
 def activate_role(
     role: str | None = typer.Argument(
         None,
-        help="Role name, ID, alias, or #N (number from list) to activate. If omitted in a TTY, you'll be prompted to search and pick.",
+        help="Role name, ID, alias, or #N (number from list) to activate. If omitted, you'll be prompted to search and pick.",
     ),
     duration: float | None = typer.Option(None, "--duration", "-d", help="Duration in hours"),
     justification: str | None = typer.Option(
@@ -483,7 +486,10 @@ def activate_role(
     ticket_system: str | None = typer.Option(None, "--ticket-system", help="Ticket system name"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
 ) -> None:
-    """Activate a role."""
+    """Activate a role.
+
+    Interactive mode is always enabled. Missing required fields will prompt for input with validation.
+    """
     try:
         from az_pim_cli.models import alias_to_normalized_role
 
@@ -494,11 +500,13 @@ def activate_role(
         role_id: str | None = None
         role_input: str | None = role
 
-        def is_interactive() -> bool:
-            try:
-                return sys.stdin.isatty()
-            except Exception:
-                return False
+        def should_prompt() -> bool:
+            """
+            Check if we should prompt the user.
+
+            Interactive mode is always enabled.
+            """
+            return True
 
         def ensure_scope(current_scope: str | None) -> str:
             """Ensure a valid scope is provided, prompting if necessary."""
@@ -509,7 +517,7 @@ def activate_role(
 
             default_sub = auth.get_subscription_id()
             default_scope = f"subscriptions/{default_sub}"
-            if is_interactive():
+            if should_prompt():
                 result = typer.prompt("Enter scope", default=default_scope)
                 return str(result) if result else default_scope
             return default_scope
@@ -518,10 +526,7 @@ def activate_role(
             if (ticket and ticket_system) or (not ticket and not ticket_system):
                 return ticket, ticket_system
 
-            if not is_interactive():
-                # Non-interactive: don't surprise with prompts; ignore incomplete ticket info.
-                return None, None
-
+            # Prompt for missing ticket fields
             if ticket and not ticket_system:
                 return ticket, typer.prompt("Ticket system name")
             if ticket_system and not ticket:
@@ -615,12 +620,8 @@ def activate_role(
 
                 console.print(roles_table)
 
-        # If no role was provided, run interactive picker (TTY only)
+        # If no role was provided, run interactive picker
         if role_input is None:
-            if not is_interactive():
-                console.print("[red]Role name or ID is required in non-interactive mode.[/red]")
-                raise typer.Exit(1)
-
             console.print(
                 "[bold blue]No role provided. Fetching aliases and eligible roles...[/bold blue]"
             )
@@ -899,7 +900,7 @@ def activate_role(
             role_id = alias.get("role")
             if not role_id:
                 console.print("[yellow]Alias is missing 'role' field.[/yellow]")
-                if is_interactive():
+                if should_prompt():
                     role_id = typer.prompt("Enter role name or ID")
                 else:
                     console.print(
@@ -919,7 +920,7 @@ def activate_role(
                     subscription = alias.get("subscription")
                     if not subscription:
                         # Prompt for subscription if missing (TTY) or use current subscription (non-TTY)
-                        if is_interactive():
+                        if should_prompt():
                             subscription = typer.prompt(
                                 "Enter subscription ID", default=auth.get_subscription_id()
                             )
@@ -937,7 +938,7 @@ def activate_role(
                     "[yellow]Resource scope is required for resource role activation.[/yellow]"
                 )
                 default_sub = auth.get_subscription_id()
-                if is_interactive():
+                if should_prompt():
                     scope = typer.prompt("Enter scope", default=f"subscriptions/{default_sub}")
                 else:
                     scope = f"subscriptions/{default_sub}"
@@ -980,7 +981,7 @@ def activate_role(
                 role_id = resolved_role.id
 
         # Prompt for missing required inputs with defaults implied by TTY
-        if is_interactive() and duration is None:
+        if should_prompt() and duration is None:
             # Suggest default duration from config (e.g., PT8H) or fallback to 8 hours
             default_dur = parse_duration_from_alias(config.get_default("duration")) or 8.0
             dur_input = typer.prompt("Enter duration (hours)", default=str(int(default_dur)))
@@ -992,7 +993,7 @@ def activate_role(
                 )
                 raise typer.Exit(1)
 
-        if is_interactive() and not justification:
+        if should_prompt() and not justification:
             default_just = config.get_default("justification") or "Requested via az-pim-cli"
             justification = typer.prompt("Enter justification", default=default_just)
 
@@ -1076,22 +1077,23 @@ def view_history(
 ) -> None:
     """View activation history."""
     try:
+        from az_pim_cli import ops
+
         auth = AzureAuth()
         client = PIMClient(auth)
         config = Config()
 
-        console.print(f"[bold blue]Fetching activation history (last {days} days)...[/bold blue]")
-
-        if resource:
-            if not scope:
-                subscription_id = auth.get_subscription_id()
-                scope = f"subscriptions/{subscription_id}"
+        with ops.status(f"Fetching activation history (last {days} days)..."):
+            if resource:
+                if not scope:
+                    subscription_id = auth.get_subscription_id()
+                    scope = f"subscriptions/{subscription_id}"
+                else:
+                    # Resolve scope input to full path
+                    scope = resolve_scope_input(scope, auth, client, config)
+                activations = client.list_resource_activation_history(scope=scope, days=days)
             else:
-                # Resolve scope input to full path
-                scope = resolve_scope_input(scope, auth, client, config)
-            activations = client.list_resource_activation_history(scope=scope, days=days)
-        else:
-            activations = client.list_activation_history(days=days)
+                activations = client.list_activation_history(days=days)
 
         if not activations:
             console.print("[yellow]No activation history found.[/yellow]")
@@ -1173,20 +1175,26 @@ def approve_request(
 ) -> None:
     """Approve a pending role activation request."""
     try:
+        from az_pim_cli import ui
+
         auth = AzureAuth()
         client = PIMClient(auth)
 
         justification = justification or "Approved via az-pim-cli"
 
-        console.print(f"\n[bold blue]Approving request:[/bold blue] {request_id}")
-        console.print(f"[blue]Justification:[/blue] {justification}\n")
+        ui.section("Approving Request")
+        ui.print_key_value("Request ID", request_id)
+        ui.print_key_value("Justification", justification)
+        console.print()
 
         client.approve_request(request_id, justification)
 
-        console.print("[bold green]✓ Request approved successfully![/bold green]")
+        ui.success("Request approved successfully!")
 
     except Exception as e:
-        console.print(f"[bold red]Error:[/bold red] {str(e)}")
+        from az_pim_cli import ui
+
+        ui.error(f"Failed to approve request: {str(e)}")
         raise typer.Exit(1)
 
 
@@ -1478,35 +1486,41 @@ def whoami(
 ) -> None:
     """Show current Azure identity and authentication information."""
     try:
+        from az_pim_cli import ui
+
         auth = AzureAuth()
 
-        console.print("\n[bold cyan]🔐 Azure Identity Information[/bold cyan]\n")
+        ui.section("🔐 Azure Identity Information")
 
         # Get tenant ID
         try:
             tenant_id = auth.get_tenant_id()
-            console.print(f"[bold]Tenant ID:[/bold] [green]{tenant_id}[/green]")
+            ui.print_key_value("Tenant ID", tenant_id, value_style="green")
         except Exception as e:
-            console.print(f"[bold]Tenant ID:[/bold] [red]Unable to retrieve ({str(e)})[/red]")
+            ui.print_key_value("Tenant ID", f"Unable to retrieve ({str(e)})", value_style="red")
 
         # Get user object ID
         try:
             user_id = auth.get_user_object_id()
-            console.print(f"[bold]User Object ID:[/bold] [green]{user_id}[/green]")
+            ui.print_key_value("User Object ID", user_id, value_style="green")
         except Exception as e:
-            console.print(f"[bold]User Object ID:[/bold] [red]Unable to retrieve ({str(e)})[/red]")
+            ui.print_key_value(
+                "User Object ID", f"Unable to retrieve ({str(e)})", value_style="red"
+            )
 
         # Get subscription ID
         try:
             subscription_id = auth.get_subscription_id()
-            console.print(f"[bold]Current Subscription:[/bold] [green]{subscription_id}[/green]")
+            ui.print_key_value("Current Subscription", subscription_id, value_style="green")
         except Exception as e:
-            console.print(
-                f"[bold]Current Subscription:[/bold] [yellow]Not available ({str(e)})[/yellow]"
+            ui.print_key_value(
+                "Current Subscription", f"Not available ({str(e)})", value_style="yellow"
             )
 
+        ui.separator()
+
         # Show auth mode
-        console.print("\n[bold]Authentication Mode:[/bold] [cyan]Azure CLI Credential[/cyan]")
+        ui.print_key_value("Authentication Mode", "Azure CLI Credential")
         console.print(
             "[dim]Using Azure CLI login (az login). "
             "Fallback to DefaultAzureCredential if Azure CLI is not available.[/dim]"
@@ -1514,14 +1528,15 @@ def whoami(
 
         # Show IPv4-only mode
         if should_use_ipv4_only():
-            console.print("\n[bold]Network Mode:[/bold] [yellow]IPv4-only mode enabled[/yellow]")
+            ui.print_key_value("Network Mode", "IPv4-only mode enabled", value_style="yellow")
 
         # Show backend
         backend = os.environ.get("AZ_PIM_BACKEND", DEFAULT_BACKEND)
-        console.print(f"[bold]Backend:[/bold] [cyan]{backend}[/cyan]")
+        ui.print_key_value("Backend", backend)
 
         if verbose:
-            console.print("\n[bold cyan]Token Validation:[/bold cyan]")
+            ui.separator()
+            ui.section("Token Validation", style="bold cyan")
             try:
                 # Validate Graph token availability
                 auth.get_token("https://graph.microsoft.com/.default")
@@ -1539,27 +1554,63 @@ def whoami(
         console.print()
 
     except AuthenticationError as e:
-        console.print(f"\n[red]✗ Authentication failed: {str(e)}[/red]")
-        if hasattr(e, "suggestion") and e.suggestion:
-            console.print(f"[yellow]Suggestion: {e.suggestion}[/yellow]\n")
+        from az_pim_cli import ui
+
+        ui.error(
+            f"Authentication failed: {str(e)}",
+            detail=e.suggestion if hasattr(e, "suggestion") and e.suggestion else None,
+        )
         raise typer.Exit(1)
     except Exception as e:
-        console.print(f"\n[red]✗ Error: {str(e)}[/red]\n")
-        if verbose:
-            import traceback
+        import traceback
 
-            console.print(f"[dim]{traceback.format_exc()}[/dim]")
+        from az_pim_cli import ui
+
+        detail = traceback.format_exc() if verbose else None
+        ui.error(f"Error: {str(e)}", detail=detail)
         raise typer.Exit(1)
 
 
 @app.command("version")
 def version() -> None:
     """Show version information."""
-    from az_pim_cli import __version__
+    from az_pim_cli import __version__, ui
 
-    console.print(
-        f"[bold blue]az-pim-cli[/bold blue] version [bold green]{__version__}[/bold green]"
-    )
+    ui.section("📦 Version Information")
+    ui.print_key_value("az-pim-cli", __version__, value_style="green bold")
+    console.print()
+
+
+@app.command("tips")
+def show_tips() -> None:
+    """Show tips and best practices for using az-pim-cli."""
+    from az_pim_cli import helptext
+
+    helptext.show_tips()
+
+
+@app.command("changelog")
+def show_changelog() -> None:
+    """Show recent changelog highlights."""
+    from az_pim_cli import helptext
+
+    helptext.show_changelog_highlights()
+
+
+@app.command("dashboard")
+def show_dashboard() -> None:
+    """Launch the interactive TUI dashboard (requires 'tui' extra)."""
+    try:
+        from az_pim_cli import dashboard
+
+        dashboard.run_dashboard()
+    except ImportError:
+        # Error message is already displayed by run_dashboard()
+        raise typer.Exit(1)
+    except KeyboardInterrupt:
+        # Clean exit on Ctrl+C
+        console.print("\n[yellow]Dashboard closed.[/yellow]")
+        raise typer.Exit(0)
 
 
 if __name__ == "__main__":
