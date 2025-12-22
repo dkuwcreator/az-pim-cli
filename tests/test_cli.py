@@ -189,7 +189,7 @@ def test_activate_alias_missing_role_non_tty(monkeypatch) -> None:
 
 
 def test_activate_prompts_defaults_when_tty(monkeypatch) -> None:
-    """TTY activation prompts for duration/justification and applies defaults."""
+    """Interactive mode prompts for duration/justification and applies defaults."""
     import types
 
     import az_pim_cli.cli as cli
@@ -246,7 +246,7 @@ def test_activate_prompts_defaults_when_tty(monkeypatch) -> None:
     )
 
     result = runner.invoke(
-        cli.app, ["activate", "62e90394-69f5-4237-9190-012177145e10"], input="\n\n"
+        cli.app, ["activate", "62e90394-69f5-4237-9190-012177145e10", "--interactive"], input="\n\n"
     )
     assert result.exit_code == 0
     assert captured["payload"]["duration"] == "PT4H"
@@ -389,7 +389,7 @@ def test_activate_no_role_interactive_search(monkeypatch) -> None:
         ),
     )
 
-    result = runner.invoke(cli.app, ["activate"], input="Owner\n1\n\n\n")
+    result = runner.invoke(cli.app, ["activate", "--interactive"], input="Owner\n1\n\n\n")
     assert result.exit_code == 0
     assert captured["payload"]["role_definition_id"] == "role-id"
     assert captured["payload"]["duration"] == "PT1H"

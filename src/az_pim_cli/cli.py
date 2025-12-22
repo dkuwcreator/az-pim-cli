@@ -1,7 +1,6 @@
 """Main CLI module for Azure PIM CLI."""
 
 import os
-import sys
 from typing import Any
 
 import typer
@@ -493,7 +492,7 @@ def activate_role(
     """Activate a role.
 
     Interactive mode (--interactive/-i) provides guided prompts and validation for all required fields.
-    Non-interactive mode (default) preserves existing behavior for scripts and CI/CD.
+    Non-interactive mode (default) is suitable for scripts and CI/CD.
     """
     try:
         from az_pim_cli.models import alias_to_normalized_role
@@ -509,16 +508,9 @@ def activate_role(
             """
             Check if we should prompt the user.
 
-            Returns True if:
-            - The --interactive flag is set, OR
-            - Running in a TTY (for backward compatibility)
-
-            This maintains backward compatibility while allowing explicit opt-in.
+            Returns True only when the --interactive flag is set.
             """
-            try:
-                return interactive or sys.stdin.isatty()
-            except Exception:
-                return interactive
+            return interactive
 
         def ensure_scope(current_scope: str | None) -> str:
             """Ensure a valid scope is provided, prompting if necessary."""

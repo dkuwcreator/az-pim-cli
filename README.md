@@ -186,7 +186,7 @@ az-pim activate --interactive
 # Interactive mode with specific role
 az-pim activate "Owner" --interactive
 
-# Works even in non-TTY environments (e.g., scripts with input)
+# Works in non-TTY environments (e.g., scripts with input)
 echo -e "8\nDeployment" | az-pim activate --interactive
 ```
 
@@ -194,8 +194,7 @@ echo -e "8\nDeployment" | az-pim activate --interactive
 - Guided prompts for missing options (duration, justification, scope)
 - Input validation with helpful error messages
 - Numbered choices for role selection
-- Backward compatible: TTY auto-detection still works
-- Opt-in for scripts: only prompts when `--interactive` is set
+- Opt-in only: prompts when `--interactive` is set
 
 **Built-in Help Commands:**
 
@@ -497,8 +496,8 @@ src/az_pim_cli/
 ├── resolver.py      # Input resolution logic
 ├── auth.py          # Authentication
 ├── config.py        # Configuration management
-├── models.py        # Backward compatibility re-exports
-└── exceptions.py    # Backward compatibility re-exports
+├── models.py        # Domain model re-exports
+└── exceptions.py    # Domain exception re-exports
 ```
 
 **Design Benefits:**
@@ -506,7 +505,6 @@ src/az_pim_cli/
 2. **Type Safety**: Pydantic validation catches configuration errors early
 3. **Testability**: Clean separation makes unit testing easier
 4. **Maintainability**: Clear boundaries reduce coupling
-5. **Backward Compatibility**: Existing code continues to work
 
 ### Setup Development Environment
 
@@ -615,7 +613,6 @@ export AZ_PIM_VERBOSE=true      # Enable verbose logging
 2. **Type Safety**: Pydantic validation catches configuration errors early
 3. **Testability**: Clean separation makes unit testing easier
 4. **Maintainability**: Clear boundaries reduce coupling
-5. **Backward Compatibility**: Existing code continues to work
 
 ### Security
 
