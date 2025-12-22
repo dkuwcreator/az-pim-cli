@@ -1608,5 +1608,21 @@ def show_changelog() -> None:
     helptext.show_changelog_highlights()
 
 
+@app.command("dashboard")
+def show_dashboard() -> None:
+    """Launch the interactive TUI dashboard (requires 'tui' extra)."""
+    try:
+        from az_pim_cli import dashboard
+
+        dashboard.run_dashboard()
+    except ImportError:
+        # Error message is already displayed by run_dashboard()
+        raise typer.Exit(1)
+    except KeyboardInterrupt:
+        # Clean exit on Ctrl+C
+        console.print("\n[yellow]Dashboard closed.[/yellow]")
+        raise typer.Exit(0)
+
+
 if __name__ == "__main__":
     app()
