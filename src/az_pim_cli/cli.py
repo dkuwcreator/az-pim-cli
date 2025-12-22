@@ -5,11 +5,11 @@ import sys
 from typing import Any
 
 import typer
-from rich.console import Console
 from rich.table import Table
 
 from az_pim_cli.auth import AzureAuth, should_use_ipv4_only
 from az_pim_cli.config import Config
+from az_pim_cli.console import console, install_traceback
 from az_pim_cli.domain.models import NormalizedRole
 from az_pim_cli.exceptions import (
     AuthenticationError,
@@ -25,6 +25,9 @@ from az_pim_cli.models import (
 from az_pim_cli.pim_client import PIMClient
 from az_pim_cli.resolver import InputResolver, resolve_role
 
+# Install Rich tracebacks for beautiful error displays
+install_traceback(show_locals=False)
+
 # Default backend for PIM operations
 DEFAULT_BACKEND = "ARM"
 
@@ -33,8 +36,6 @@ app = typer.Typer(
     help="Azure PIM CLI - Manage Azure Privileged Identity Management roles",
     no_args_is_help=True,
 )
-
-console = Console()
 
 
 def get_resolver(config: Config, is_tty: bool | None = None) -> InputResolver:

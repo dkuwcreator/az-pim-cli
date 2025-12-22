@@ -8,11 +8,10 @@ Reference:
 - https://rich.readthedocs.io/en/stable/introduction.html
 """
 
-from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-console = Console()
+from az_pim_cli.console import console
 
 
 def create_roles_table(
