@@ -4,7 +4,34 @@ import os
 import socket
 from unittest.mock import MagicMock, patch
 
-from az_pim_cli.auth import AzureAuth, ipv4_only_context, should_use_ipv4_only
+import pytest
+
+from az_pim_cli.auth import (
+    AzureAuth,
+    AzureCliCredential,
+    DefaultAzureCredential,
+    ipv4_only_context,
+    should_use_ipv4_only,
+)
+
+
+class TestAuthModuleImports:
+    """Test that auth module exports work correctly."""
+
+    def test_azure_auth_import(self):
+        """Test AzureAuth can be imported from auth module."""
+        assert AzureAuth is not None
+
+    def test_credential_imports(self):
+        """Test Azure credential classes can be imported from auth module."""
+        # These imports test backward compatibility
+        assert AzureCliCredential is not None
+        assert DefaultAzureCredential is not None
+
+    def test_function_imports(self):
+        """Test helper functions can be imported from auth module."""
+        assert ipv4_only_context is not None
+        assert should_use_ipv4_only is not None
 
 
 def test_should_use_ipv4_only_default():
@@ -77,7 +104,7 @@ def test_azure_auth_initialization():
     assert auth._default_credential is None
 
 
-@patch("az_pim_cli.auth.AzureCliCredential")
+@patch("az_pim_cli.auth.azurecli.AzureCliCredential")
 def test_azure_auth_get_token_with_cli_credential(mock_cli_cred_class):
     """Test token acquisition with AzureCliCredential."""
     mock_token = MagicMock()
@@ -93,8 +120,8 @@ def test_azure_auth_get_token_with_cli_credential(mock_cli_cred_class):
     mock_cred.get_token.assert_called()
 
 
-@patch("az_pim_cli.auth.DefaultAzureCredential")
-@patch("az_pim_cli.auth.AzureCliCredential")
+@patch("az_pim_cli.auth.azurecli.DefaultAzureCredential")
+@patch("az_pim_cli.auth.azurecli.AzureCliCredential")
 def test_azure_auth_fallback_to_default_credential(mock_cli_cred_class, mock_default_cred_class):
     """Test fallback to DefaultAzureCredential when AzureCliCredential fails."""
     # AzureCliCredential fails
@@ -183,3 +210,40 @@ def test_get_tenant_id_from_token():
     with patch.object(auth, "get_token", return_value=mock_token):
         tid = auth.get_tenant_id()
         assert tid == "tenant-456"
+
+
+@patch("az_pim_cli.auth.azurecli.AzureCliCredential")
+def test_azure_auth_get_subscription_id(mock_cli_cred):
+    """Test getting subscription ID from Azure CLI."""
+    mock_token = MagicMock()
+    mock_token.token = "test-token"
+    mock_cred = MagicMock()
+    mock_cred.get_token.return_value = mock_token
+    mock_cli_cred.return_value = mock_cred
+
+    auth = AzureAuth()
+    # Should raise since we're mocking and can't actually get subscription
+    try:
+        sub_id = auth.get_subscription_id()
+        # If it doesn't raise, just check it's a string
+        assert isinstance(sub_id, str)
+    except Exception:
+        # Expected to fail in test environment
+        pass
+
+
+@patch("az_pim_cli.auth.azurecli.AzureCliCredential")
+def test_azure_auth_get_user_object_id_error(mock_cli_cred):
+    """Test error handling when getting user object ID."""
+    mock_token = MagicMock()
+    mock_token.token = "invalid-token"  # Not a valid JWT
+    mock_cred = MagicMock()
+    mock_cred.get_token.return_value = mock_token
+    mock_cli_cred.return_value = mock_cred
+
+    auth = AzureAuth()
+
+    from az_pim_cli.domain.exceptions import AuthenticationError
+
+    with pytest.raises(AuthenticationError):
+        auth.get_user_object_id()

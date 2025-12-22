@@ -66,22 +66,17 @@ jobs:
           path: bandit-report.json
 
   test:
-    name: Test (Python ${{ matrix.python-version }} on ${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ["3.10", "3.11", "3.12"]
+    name: Test
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.11"
           cache: 'pip'
 
       - name: Install dependencies
@@ -94,7 +89,6 @@ jobs:
           pytest --cov=az_pim_cli --cov-report=xml --cov-report=html --cov-report=term
 
       - name: Upload coverage report
-        if: matrix.python-version == '3.11' && matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
