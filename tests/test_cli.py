@@ -15,6 +15,99 @@ def test_version_command() -> None:
     assert "0.1.0" in result.stdout
 
 
+def test_whoami_command(monkeypatch) -> None:
+    """Test whoami command."""
+    import az_pim_cli.cli as cli
+
+    class FakeAuth:
+        def get_tenant_id(self) -> str:
+            return "test-tenant-id"
+
+        def get_user_object_id(self) -> str:
+            return "test-user-id"
+
+        def get_subscription_id(self) -> str:
+            return "test-subscription-id"
+
+        def get_token(self, scope: str) -> str:
+            return "fake-token"
+
+    monkeypatch.setattr(cli, "AzureAuth", FakeAuth)
+
+    result = runner.invoke(app, ["whoami"])
+    assert result.exit_code == 0
+    assert "test-tenant-id" in result.stdout
+    assert "test-user-id" in result.stdout
+    assert "test-subscription-id" in result.stdout
+
+
+def test_whoami_command_verbose(monkeypatch) -> None:
+    """Test whoami command with verbose flag."""
+    import az_pim_cli.cli as cli
+
+    class FakeAuth:
+        def get_tenant_id(self) -> str:
+            return "test-tenant-id"
+
+        def get_user_object_id(self) -> str:
+            return "test-user-id"
+
+        def get_subscription_id(self) -> str:
+            return "test-subscription-id"
+
+        def get_token(self, scope: str) -> str:
+            return "fake-token"
+
+    monkeypatch.setattr(cli, "AzureAuth", FakeAuth)
+
+    result = runner.invoke(app, ["whoami", "--verbose"])
+    assert result.exit_code == 0
+    assert "test-tenant-id" in result.stdout
+    assert "Token Validation" in result.stdout or "token available" in result.stdout
+
+
+def test_whoami_command_auth_error(monkeypatch) -> None:
+    """Test whoami command with authentication initialization error."""
+    import az_pim_cli.cli as cli
+    from az_pim_cli.exceptions import AuthenticationError
+
+    class FakeAuth:
+        def __init__(self):
+            raise AuthenticationError("Auth failed", suggestion="Run az login")
+
+    monkeypatch.setattr(cli, "AzureAuth", FakeAuth)
+
+    result = runner.invoke(app, ["whoami"])
+    assert result.exit_code == 1
+    assert "Authentication failed" in result.stdout
+
+
+def test_whoami_command_partial_failure(monkeypatch) -> None:
+    """Test whoami command with partial failures."""
+    import az_pim_cli.cli as cli
+
+    class FakeAuth:
+        def get_tenant_id(self) -> str:
+            return "test-tenant-id"
+
+        def get_user_object_id(self) -> str:
+            return "test-user-id"
+
+        def get_subscription_id(self) -> str:
+            raise RuntimeError("No subscription")
+
+        def get_token(self, scope: str) -> str:
+            return "fake-token"
+
+    monkeypatch.setattr(cli, "AzureAuth", FakeAuth)
+
+    result = runner.invoke(app, ["whoami"])
+    assert result.exit_code == 0
+    assert "test-tenant-id" in result.stdout
+    assert "test-user-id" in result.stdout
+    assert "Not available" in result.stdout or "No subscription" in result.stdout
+
+
 def test_alias_list_command() -> None:
     """Test alias list command."""
     result = runner.invoke(app, ["alias", "list"])
