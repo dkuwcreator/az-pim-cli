@@ -1204,6 +1204,7 @@ def approve_request(
 
     except Exception as e:
         from az_pim_cli import ui
+
         ui.error(f"Failed to approve request: {str(e)}")
         raise typer.Exit(1)
 
@@ -1514,14 +1515,18 @@ def whoami(
             user_id = auth.get_user_object_id()
             ui.print_key_value("User Object ID", user_id, value_style="green")
         except Exception as e:
-            ui.print_key_value("User Object ID", f"Unable to retrieve ({str(e)})", value_style="red")
+            ui.print_key_value(
+                "User Object ID", f"Unable to retrieve ({str(e)})", value_style="red"
+            )
 
         # Get subscription ID
         try:
             subscription_id = auth.get_subscription_id()
             ui.print_key_value("Current Subscription", subscription_id, value_style="green")
         except Exception as e:
-            ui.print_key_value("Current Subscription", f"Not available ({str(e)})", value_style="yellow")
+            ui.print_key_value(
+                "Current Subscription", f"Not available ({str(e)})", value_style="yellow"
+            )
 
         ui.separator()
 
@@ -1561,12 +1566,17 @@ def whoami(
 
     except AuthenticationError as e:
         from az_pim_cli import ui
-        ui.error(f"Authentication failed: {str(e)}", detail=e.suggestion if hasattr(e, "suggestion") and e.suggestion else None)
+
+        ui.error(
+            f"Authentication failed: {str(e)}",
+            detail=e.suggestion if hasattr(e, "suggestion") and e.suggestion else None,
+        )
         raise typer.Exit(1)
     except Exception as e:
         import traceback
 
         from az_pim_cli import ui
+
         detail = traceback.format_exc() if verbose else None
         ui.error(f"Error: {str(e)}", detail=detail)
         raise typer.Exit(1)

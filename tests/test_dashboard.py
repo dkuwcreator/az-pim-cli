@@ -26,4 +26,3 @@ class TestRunDashboard:
 
         with pytest.raises(ImportError, match="textual package not found"):
             run_dashboard()
-

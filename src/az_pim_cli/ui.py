@@ -66,7 +66,9 @@ def warn(message: str, *, title: str | None = None, emoji: str = "⚠") -> None:
     console.print(Panel(message, style="yellow", title=panel_title, border_style="yellow"))
 
 
-def error(message: str, *, detail: str | None = None, title: str | None = None, emoji: str = "✗") -> None:
+def error(
+    message: str, *, detail: str | None = None, title: str | None = None, emoji: str = "✗"
+) -> None:
     """
     Print an error message in a red panel.
 
@@ -85,7 +87,9 @@ def error(message: str, *, detail: str | None = None, title: str | None = None, 
     console.print(Panel(full_message, style="red", title=panel_title, border_style="red"))
 
 
-def print_key_value(key: str, value: Any, *, key_style: str = "bold", value_style: str = "cyan") -> None:
+def print_key_value(
+    key: str, value: Any, *, key_style: str = "bold", value_style: str = "cyan"
+) -> None:
     """
     Print a key-value pair with consistent formatting.
 

@@ -31,9 +31,7 @@ class TestCreateSummaryTable:
 
     def test_create_summary_table_custom_styles(self):
         """Test creating summary table with custom styles."""
-        table = create_summary_table(
-            "Test", header_style="bold green", border_style="red"
-        )
+        table = create_summary_table("Test", header_style="bold green", border_style="red")
         assert isinstance(table, Table)
 
 
@@ -130,9 +128,7 @@ class TestPrintRoleStatusSummary:
     @patch("az_pim_cli.report.console")
     def test_print_role_status_summary_custom_title(self, mock_console):
         """Test printing role status summary with custom title."""
-        print_role_status_summary(
-            total_roles=5, active_roles=2, eligible_roles=3, title="My Roles"
-        )
+        print_role_status_summary(total_roles=5, active_roles=2, eligible_roles=3, title="My Roles")
 
         mock_console.print.assert_called_once()
 

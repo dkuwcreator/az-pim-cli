@@ -105,9 +105,7 @@ def run_dashboard() -> None:
             # Sample data - in real implementation, this would fetch from Azure
             table.add_row("Owner", "Eligible", "/subscriptions/...", "Azure RBAC")
             table.add_row("Contributor", "Active", "/subscriptions/...", "Azure RBAC")
-            table.add_row(
-                "Global Administrator", "Eligible", "/", "Azure AD"
-            )
+            table.add_row("Global Administrator", "Eligible", "/", "Azure AD")
             table.add_row("Security Reader", "Eligible", "/", "Azure AD")
 
         def action_refresh(self) -> None:
