@@ -20,12 +20,16 @@ from pathlib import Path
 src_path = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
-from rich.console import Console
-from rich.table import Table
+from rich.console import Console  # noqa: E402
+from rich.table import Table  # noqa: E402
 
-from az_pim_cli.auth import AzureAuth
-from az_pim_cli.exceptions import AuthenticationError, NetworkError, PermissionError
-from az_pim_cli.providers.entra_graph import EntraGraphProvider
+from az_pim_cli.auth import AzureAuth  # noqa: E402
+from az_pim_cli.exceptions import (  # noqa: E402
+    AuthenticationError,
+    NetworkError,
+    PermissionError,
+)
+from az_pim_cli.providers.entra_graph import EntraGraphProvider  # noqa: E402
 
 console = Console()
 
@@ -44,7 +48,7 @@ def main() -> int:
         console.print(f"  ✓ Tenant: [green]{tenant_id}[/green]")
     except AuthenticationError as e:
         console.print(f"  [red]✗ Authentication failed: {str(e)}[/red]")
-        if hasattr(e, 'suggestion') and e.suggestion:
+        if hasattr(e, "suggestion") and e.suggestion:
             console.print(f"  [yellow]Suggestion: {e.suggestion}[/yellow]")
         return 1
     except Exception as e:
@@ -59,12 +63,12 @@ def main() -> int:
         console.print(f"  ✓ Retrieved [green]{len(roles)}[/green] eligible Entra roles")
     except PermissionError as e:
         console.print(f"  [red]✗ Permission denied: {str(e)}[/red]")
-        if hasattr(e, 'required_permissions') and e.required_permissions:
+        if hasattr(e, "required_permissions") and e.required_permissions:
             console.print(f"  [yellow]Required permissions: {e.required_permissions}[/yellow]")
         return 1
     except NetworkError as e:
         console.print(f"  [red]✗ Network error: {str(e)}[/red]")
-        if hasattr(e, 'suggest_ipv4') and e.suggest_ipv4:
+        if hasattr(e, "suggest_ipv4") and e.suggest_ipv4:
             console.print("  [yellow]Suggestion: Try setting AZ_PIM_IPV4_ONLY=1[/yellow]")
         return 1
     except Exception as e:

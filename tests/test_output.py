@@ -1,8 +1,7 @@
 """Tests for output formatting utilities."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
 from rich.table import Table
 
 from az_pim_cli.output import (
@@ -182,4 +181,3 @@ class TestPrintFunctions:
         """Test print_info function."""
         print_info("Info message")
         mock_console.print.assert_called_once()
-

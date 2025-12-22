@@ -242,7 +242,8 @@ def test_azure_auth_get_user_object_id_error(mock_cli_cred):
     mock_cli_cred.return_value = mock_cred
 
     auth = AzureAuth()
-    
+
     from az_pim_cli.domain.exceptions import AuthenticationError
+
     with pytest.raises(AuthenticationError):
         auth.get_user_object_id()

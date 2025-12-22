@@ -1,7 +1,5 @@
 """Tests for domain exceptions."""
 
-import pytest
-
 from az_pim_cli.domain.exceptions import (
     AuthenticationError,
     NetworkError,
@@ -94,9 +92,6 @@ class TestParsingError:
 
     def test_parsing_error_with_response_data(self):
         """Test creating ParsingError with response data."""
-        error = ParsingError(
-            "Failed to parse response", response_data='{"invalid": json'
-        )
+        error = ParsingError("Failed to parse response", response_data='{"invalid": json')
         assert str(error) == "Failed to parse response"
         assert error.response_data == '{"invalid": json'
-

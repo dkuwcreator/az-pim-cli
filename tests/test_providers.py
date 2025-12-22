@@ -2,8 +2,6 @@
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from az_pim_cli.auth import AzureAuth
 from az_pim_cli.providers import AzureARMProvider, EntraGraphProvider
 
@@ -95,5 +93,3 @@ class TestAzureARMProvider:
         assert "Authorization" in headers
         assert headers["Authorization"] == "Bearer test-arm-token"
         assert "Content-Type" in headers
-
-
