@@ -8,7 +8,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from az_pim_cli.auth import AzureAuth
+from az_pim_cli.auth import AzureAuth, should_use_ipv4_only
 from az_pim_cli.config import Config
 from az_pim_cli.domain.models import NormalizedRole
 from az_pim_cli.exceptions import (
@@ -24,6 +24,9 @@ from az_pim_cli.models import (
 )
 from az_pim_cli.pim_client import PIMClient
 from az_pim_cli.resolver import InputResolver, resolve_role
+
+# Default backend for PIM operations
+DEFAULT_BACKEND = "ARM"
 
 app = typer.Typer(
     name="az-pim",
@@ -248,7 +251,7 @@ def list_roles(
 
         # Show backend info in verbose mode
         if verbose:
-            backend = os.environ.get("AZ_PIM_BACKEND", "ARM")
+            backend = os.environ.get("AZ_PIM_BACKEND", DEFAULT_BACKEND)
             ipv4_mode = os.environ.get("AZ_PIM_IPV4_ONLY", "off")
             console.print(f"[dim]Backend: {backend} | IPv4-only: {ipv4_mode}[/dim]")
 
@@ -1510,15 +1513,13 @@ def whoami(
         )
 
         # Show IPv4-only mode
-        from az_pim_cli.auth import should_use_ipv4_only
-
         if should_use_ipv4_only():
             console.print(
                 "\n[bold]Network Mode:[/bold] [yellow]IPv4-only mode enabled[/yellow]"
             )
 
         # Show backend
-        backend = os.environ.get("AZ_PIM_BACKEND", "ARM")
+        backend = os.environ.get("AZ_PIM_BACKEND", DEFAULT_BACKEND)
         console.print(f"[bold]Backend:[/bold] [cyan]{backend}[/cyan]")
 
         if verbose:
