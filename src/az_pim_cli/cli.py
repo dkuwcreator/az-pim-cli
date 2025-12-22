@@ -472,7 +472,7 @@ def list_roles(
 def activate_role(
     role: str | None = typer.Argument(
         None,
-        help="Role name, ID, alias, or #N (number from list) to activate. If omitted in a TTY, you'll be prompted to search and pick.",
+        help="Role name, ID, alias, or #N (number from list) to activate. If omitted, you'll be prompted to search and pick.",
     ),
     duration: float | None = typer.Option(None, "--duration", "-d", help="Duration in hours"),
     justification: str | None = typer.Option(
@@ -485,14 +485,10 @@ def activate_role(
     ticket: str | None = typer.Option(None, "--ticket", "-t", help="Ticket number"),
     ticket_system: str | None = typer.Option(None, "--ticket-system", help="Ticket system name"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
-    interactive: bool = typer.Option(
-        False, "--interactive", "-i", help="Enable interactive mode with guided prompts (opt-in)"
-    ),
 ) -> None:
     """Activate a role.
 
-    Interactive mode (--interactive/-i) provides guided prompts and validation for all required fields.
-    Non-interactive mode (default) is suitable for scripts and CI/CD.
+    Interactive mode is always enabled. Missing required fields will prompt for input with validation.
     """
     try:
         from az_pim_cli.models import alias_to_normalized_role
@@ -508,9 +504,9 @@ def activate_role(
             """
             Check if we should prompt the user.
 
-            Returns True only when the --interactive flag is set.
+            Interactive mode is always enabled.
             """
-            return interactive
+            return True
 
         def ensure_scope(current_scope: str | None) -> str:
             """Ensure a valid scope is provided, prompting if necessary."""
@@ -530,10 +526,7 @@ def activate_role(
             if (ticket and ticket_system) or (not ticket and not ticket_system):
                 return ticket, ticket_system
 
-            if not should_prompt():
-                # Non-interactive: don't surprise with prompts; ignore incomplete ticket info.
-                return None, None
-
+            # Prompt for missing ticket fields
             if ticket and not ticket_system:
                 return ticket, typer.prompt("Ticket system name")
             if ticket_system and not ticket:
@@ -627,12 +620,8 @@ def activate_role(
 
                 console.print(roles_table)
 
-        # If no role was provided, run interactive picker (TTY only)
+        # If no role was provided, run interactive picker
         if role_input is None:
-            if not should_prompt():
-                console.print("[red]Role name or ID is required in non-interactive mode.[/red]")
-                raise typer.Exit(1)
-
             console.print(
                 "[bold blue]No role provided. Fetching aliases and eligible roles...[/bold blue]"
             )

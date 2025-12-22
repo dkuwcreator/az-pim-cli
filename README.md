@@ -13,7 +13,7 @@ A lightweight Python + Typer CLI for Azure Privileged Identity Management (PIM).
 - 🏷️ **Aliases**: Define custom aliases with preset duration, justification, and scope
 - 🔑 **Flexible Auth**: Uses Azure CLI credentials or MSAL for authentication
 - 🎨 **Rich UI**: Beautiful terminal output with colors, tables, panels, and progress bars
-- 🤖 **Interactive Mode**: Guided prompts with validation (opt-in via `--interactive/-i`)
+- 🤖 **Interactive Prompts**: Guided prompts with validation for missing fields
 - ⏳ **Progress Indicators**: Status spinners and progress bars for long operations
 - 📋 **Enhanced Tables**: Consistent, readable table formatting with Rich
 - 💡 **Built-in Tips**: `az-pim tips` for quick help and best practices
@@ -175,26 +175,23 @@ defaults:
 
 See [EXAMPLES.md](docs/EXAMPLES.md#smart-input-resolution) for more details.
 
-### Interactive Mode
+### Interactive Prompts
 
-Enable guided prompts with validation using the `--interactive` (or `-i`) flag:
+The CLI provides guided prompts with validation for missing required fields:
 
 ```bash
-# Activate with interactive prompts
-az-pim activate --interactive
+# Activate a role - will prompt for missing options
+az-pim activate "Owner"
 
-# Interactive mode with specific role
-az-pim activate "Owner" --interactive
-
-# Works in non-TTY environments (e.g., scripts with input)
-echo -e "8\nDeployment" | az-pim activate --interactive
+# Prompts for duration, justification, and other missing fields
+# Provides sensible defaults from config
 ```
 
-**Features of Interactive Mode:**
+**Features:**
 - Guided prompts for missing options (duration, justification, scope)
 - Input validation with helpful error messages
 - Numbered choices for role selection
-- Opt-in only: prompts when `--interactive` is set
+- Always enabled for a better user experience
 
 **Built-in Help Commands:**
 

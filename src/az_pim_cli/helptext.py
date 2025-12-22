@@ -54,8 +54,8 @@ az-pim activate "Owner" --duration 4 --justification "Production deployment"
 # Activate by number (from list)
 az-pim activate 1 --duration 2
 
-# Interactive mode (guided prompts)
-az-pim activate --interactive
+# Missing fields will prompt automatically
+az-pim activate "Owner"
 ```
 
 ## Using Aliases
@@ -73,16 +73,15 @@ az-pim alias add prod-admin "Owner" \\
 az-pim activate prod-admin
 ```
 
-## Interactive Mode
+## Interactive Prompts
 
-Use `--interactive` or `-i` for guided prompts:
+Missing fields are automatically prompted with validation:
 
 ```bash
-# Guided activation with validation
-az-pim activate --interactive
+# Will prompt for duration and justification
+az-pim activate "Owner"
 
-# Works in TTY automatically, or force with flag
-az-pim activate "Owner" -i
+# Prompts always use sensible defaults from config
 ```
 
 ## Configuration
@@ -139,7 +138,7 @@ CHANGELOG_HIGHLIGHTS = """
 
 ### New Features
 - ✨ **Rich UI**: Beautiful terminal output with colors, tables, and panels
-- 🎯 **Interactive Mode**: Guided prompts with `--interactive/-i` flag
+- 🎯 **Interactive Prompts**: Automatic guided prompts for missing fields
 - 📊 **Progress Indicators**: Status spinners and progress bars for long operations
 - 🎨 **Enhanced Tables**: Consistent, readable table formatting
 - 📝 **Smart Prompts**: Input validation and helpful error messages
@@ -150,7 +149,7 @@ CHANGELOG_HIGHLIGHTS = """
 - Better error messages with suggestions
 - Auto-wrapping text to terminal width
 - Clean logs for CI/CD (transient progress bars)
-- Backward-compatible: existing scripts work unchanged
+- Always-on interactive prompts for better UX
 
 For complete changelog, see CHANGELOG.md
 """
