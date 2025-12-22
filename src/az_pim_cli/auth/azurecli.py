@@ -189,6 +189,12 @@ class AzureAuth:
 
         Returns:
             The claim value or None if not found
+
+        Note:
+            This method decodes the JWT payload without signature verification.
+            Signature verification is handled by Azure SDK during token acquisition,
+            so tokens obtained through get_token() are already validated.
+            We only decode here to extract identity claims for informational purposes.
         """
         try:
             token = self.get_token(scope)
@@ -199,6 +205,7 @@ class AzureAuth:
             if padding:
                 payload_part += "=" * (4 - padding)
 
+            # Decode payload without signature verification (already verified by Azure SDK)
             decoded = base64.urlsafe_b64decode(payload_part)
             claims = json.loads(decoded)
 

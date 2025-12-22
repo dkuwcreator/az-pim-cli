@@ -1510,8 +1510,9 @@ def whoami(
         )
 
         # Show IPv4-only mode
-        ipv4_mode = os.environ.get("AZ_PIM_IPV4_ONLY", "").lower()
-        if ipv4_mode in ("1", "true", "yes", "on"):
+        from az_pim_cli.auth import should_use_ipv4_only
+
+        if should_use_ipv4_only():
             console.print(
                 "\n[bold]Network Mode:[/bold] [yellow]IPv4-only mode enabled[/yellow]"
             )
