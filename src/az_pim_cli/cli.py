@@ -1510,8 +1510,8 @@ def whoami(
         )
 
         # Show IPv4-only mode
-        ipv4_mode = os.environ.get("AZ_PIM_IPV4_ONLY", "")
-        if ipv4_mode:
+        ipv4_mode = os.environ.get("AZ_PIM_IPV4_ONLY", "").lower()
+        if ipv4_mode in ("1", "true", "yes", "on"):
             console.print(
                 "\n[bold]Network Mode:[/bold] [yellow]IPv4-only mode enabled[/yellow]"
             )
@@ -1521,20 +1521,20 @@ def whoami(
         console.print(f"[bold]Backend:[/bold] [cyan]{backend}[/cyan]")
 
         if verbose:
-            console.print("\n[bold cyan]Token Information:[/bold cyan]")
+            console.print("\n[bold cyan]Token Validation:[/bold cyan]")
             try:
-                # Get Graph token
+                # Validate Graph token availability
                 auth.get_token("https://graph.microsoft.com/.default")
-                console.print("[dim]Graph API token acquired successfully[/dim]")
+                console.print("[dim]✓ Graph API token available[/dim]")
             except Exception as e:
-                console.print(f"[dim]Graph API token: [red]Failed ({str(e)})[/red][/dim]")
+                console.print(f"[dim]✗ Graph API token: [red]Failed ({str(e)})[/red][/dim]")
 
             try:
-                # Get ARM token
+                # Validate ARM token availability
                 auth.get_token("https://management.azure.com/.default")
-                console.print("[dim]ARM API token acquired successfully[/dim]")
+                console.print("[dim]✓ ARM API token available[/dim]")
             except Exception as e:
-                console.print(f"[dim]ARM API token: [red]Failed ({str(e)})[/red][/dim]")
+                console.print(f"[dim]✗ ARM API token: [red]Failed ({str(e)})[/red][/dim]")
 
         console.print()
 
