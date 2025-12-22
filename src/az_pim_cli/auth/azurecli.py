@@ -88,20 +88,23 @@ class AzureAuth:
             except Exception:
                 self._credential = None
 
+        # Try DefaultAzureCredential
         if self._default_credential is None:
-            try:
-                self._default_credential = DefaultAzureCredential()
-            except Exception as e:
-                raise AuthenticationError(
-                    "No Azure credentials available",
-                    suggestion=(
-                        "Run 'az login' to authenticate with Azure CLI, "
-                        "or configure Azure SDK credentials "
-                        "(service principal, managed identity, etc.)"
-                    ),
-                ) from e
+            self._default_credential = DefaultAzureCredential()
 
-        return self._default_credential
+        try:
+            # Test the credential
+            self._default_credential.get_token("https://management.azure.com/.default")
+            return self._default_credential
+        except Exception as e:
+            raise AuthenticationError(
+                "No Azure credentials available",
+                suggestion=(
+                    "Run 'az login' to authenticate with Azure CLI, "
+                    "or configure Azure SDK credentials "
+                    "(service principal, managed identity, etc.)"
+                ),
+            ) from e
 
     def get_token(self, scope: str = "https://graph.microsoft.com/.default") -> str:
         """

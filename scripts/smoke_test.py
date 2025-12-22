@@ -43,8 +43,8 @@ def main() -> int:
         console.print(f"  ✓ Authenticated as user [green]{user_id}[/green]")
         console.print(f"  ✓ Tenant: [green]{tenant_id}[/green]")
     except AuthenticationError as e:
-        console.print(f"  [red]✗ Authentication failed: {e.message}[/red]")
-        if e.suggestion:
+        console.print(f"  [red]✗ Authentication failed: {str(e)}[/red]")
+        if hasattr(e, 'suggestion') and e.suggestion:
             console.print(f"  [yellow]Suggestion: {e.suggestion}[/yellow]")
         return 1
     except Exception as e:
@@ -58,12 +58,13 @@ def main() -> int:
         roles = provider.list_eligible_roles(limit=5)  # Limit to 5 for smoke test
         console.print(f"  ✓ Retrieved [green]{len(roles)}[/green] eligible Entra roles")
     except PermissionError as e:
-        console.print(f"  [red]✗ Permission denied: {e.message}[/red]")
-        console.print(f"  [yellow]Required permissions: {', '.join(e.required_permissions)}[/yellow]")
+        console.print(f"  [red]✗ Permission denied: {str(e)}[/red]")
+        if hasattr(e, 'required_permissions') and e.required_permissions:
+            console.print(f"  [yellow]Required permissions: {e.required_permissions}[/yellow]")
         return 1
     except NetworkError as e:
-        console.print(f"  [red]✗ Network error: {e.message}[/red]")
-        if e.suggest_ipv4:
+        console.print(f"  [red]✗ Network error: {str(e)}[/red]")
+        if hasattr(e, 'suggest_ipv4') and e.suggest_ipv4:
             console.print("  [yellow]Suggestion: Try setting AZ_PIM_IPV4_ONLY=1[/yellow]")
         return 1
     except Exception as e:
