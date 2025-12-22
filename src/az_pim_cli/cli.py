@@ -1474,7 +1474,7 @@ def edit_alias(name: str = typer.Argument(..., help="Alias name to edit")) -> No
 
 @app.command("whoami")
 def whoami(
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output")
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
 ) -> None:
     """Show current Azure identity and authentication information."""
     try:
@@ -1514,9 +1514,7 @@ def whoami(
 
         # Show IPv4-only mode
         if should_use_ipv4_only():
-            console.print(
-                "\n[bold]Network Mode:[/bold] [yellow]IPv4-only mode enabled[/yellow]"
-            )
+            console.print("\n[bold]Network Mode:[/bold] [yellow]IPv4-only mode enabled[/yellow]")
 
         # Show backend
         backend = os.environ.get("AZ_PIM_BACKEND", DEFAULT_BACKEND)
@@ -1549,6 +1547,7 @@ def whoami(
         console.print(f"\n[red]✗ Error: {str(e)}[/red]\n")
         if verbose:
             import traceback
+
             console.print(f"[dim]{traceback.format_exc()}[/dim]")
         raise typer.Exit(1)
 
