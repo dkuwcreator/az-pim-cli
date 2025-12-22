@@ -680,7 +680,9 @@ def activate_role(
                     has_rapidfuzz = False
 
                 fuzzy_threshold = config.get_default("fuzzy_threshold", 0.6)
-                fuzzy_threshold_float = float(fuzzy_threshold) if fuzzy_threshold is not None else 0.6
+                fuzzy_threshold_float = (
+                    float(fuzzy_threshold) if fuzzy_threshold is not None else 0.6
+                )
 
                 # Filter matches based on fuzzy matching
                 matched_roles: list[tuple[int, NormalizedRole, float]] = []
