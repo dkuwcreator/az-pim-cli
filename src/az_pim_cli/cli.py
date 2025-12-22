@@ -1524,15 +1524,15 @@ def whoami(
             console.print("\n[bold cyan]Token Information:[/bold cyan]")
             try:
                 # Get Graph token
-                graph_token = auth.get_token("https://graph.microsoft.com/.default")
-                console.print(f"[dim]Graph API token acquired (length: {len(graph_token)})[/dim]")
+                auth.get_token("https://graph.microsoft.com/.default")
+                console.print("[dim]Graph API token acquired successfully[/dim]")
             except Exception as e:
                 console.print(f"[dim]Graph API token: [red]Failed ({str(e)})[/red][/dim]")
 
             try:
                 # Get ARM token
-                arm_token = auth.get_token("https://management.azure.com/.default")
-                console.print(f"[dim]ARM API token acquired (length: {len(arm_token)})[/dim]")
+                auth.get_token("https://management.azure.com/.default")
+                console.print("[dim]ARM API token acquired successfully[/dim]")
             except Exception as e:
                 console.print(f"[dim]ARM API token: [red]Failed ({str(e)})[/red][/dim]")
 
