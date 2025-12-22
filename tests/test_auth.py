@@ -77,7 +77,7 @@ def test_azure_auth_initialization():
     assert auth._default_credential is None
 
 
-@patch("az_pim_cli.auth.AzureCliCredential")
+@patch("az_pim_cli.auth.azurecli.AzureCliCredential")
 def test_azure_auth_get_token_with_cli_credential(mock_cli_cred_class):
     """Test token acquisition with AzureCliCredential."""
     mock_token = MagicMock()
@@ -93,8 +93,8 @@ def test_azure_auth_get_token_with_cli_credential(mock_cli_cred_class):
     mock_cred.get_token.assert_called()
 
 
-@patch("az_pim_cli.auth.DefaultAzureCredential")
-@patch("az_pim_cli.auth.AzureCliCredential")
+@patch("az_pim_cli.auth.azurecli.DefaultAzureCredential")
+@patch("az_pim_cli.auth.azurecli.AzureCliCredential")
 def test_azure_auth_fallback_to_default_credential(mock_cli_cred_class, mock_default_cred_class):
     """Test fallback to DefaultAzureCredential when AzureCliCredential fails."""
     # AzureCliCredential fails

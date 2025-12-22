@@ -100,7 +100,9 @@ class EntraGraphProvider:
 
                 if response.status_code == 403:
                     error_data = response.json() if response.text else {}
-                    error_msg = error_data.get("error", {}).get("message", "Insufficient permissions")
+                    error_msg = error_data.get("error", {}).get(
+                        "message", "Insufficient permissions"
+                    )
                     raise PermissionError(
                         message=f"Permission denied for {operation}: {error_msg}",
                         endpoint=url,
@@ -165,9 +167,7 @@ class EntraGraphProvider:
 
         all_results = []
         while True:
-            data = self._make_request(
-                "GET", url, params, operation="list eligible Entra roles"
-            )
+            data = self._make_request("GET", url, params, operation="list eligible Entra roles")
 
             values = data.get("value", [])
             all_results.extend(values)
@@ -234,9 +234,7 @@ class EntraGraphProvider:
         if ticket_number and ticket_system:
             payload["ticketInfo"] = {"ticketNumber": ticket_number, "ticketSystem": ticket_system}
 
-        return self._make_request(
-            "POST", url, json_data=payload, operation="activate Entra role"
-        )
+        return self._make_request("POST", url, json_data=payload, operation="activate Entra role")
 
     def list_assignment_requests(
         self, principal_id: str | None = None, limit: int | None = None
@@ -298,9 +296,7 @@ class EntraGraphProvider:
         url = f"{self.GRAPH_API_BETA}/roleManagement/directory/roleAssignmentScheduleRequests/filterByCurrentUser(on='approver')"
         params = {"$filter": "status eq 'PendingApproval'"}
 
-        data = self._make_request(
-            "GET", url, params, operation="list pending Entra role approvals"
-        )
+        data = self._make_request("GET", url, params, operation="list pending Entra role approvals")
 
         return data.get("value", [])  # type: ignore[no-any-return]
 

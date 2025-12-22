@@ -101,7 +101,9 @@ class AzureARMProvider:
 
                 if response.status_code == 403:
                     error_data = response.json() if response.text else {}
-                    error_msg = error_data.get("error", {}).get("message", "Insufficient permissions")
+                    error_msg = error_data.get("error", {}).get(
+                        "message", "Insufficient permissions"
+                    )
                     raise PermissionError(
                         message=f"Permission denied for {operation}: {error_msg}",
                         endpoint=url,
@@ -250,7 +252,11 @@ class AzureARMProvider:
         params = {"api-version": self.API_VERSION}
 
         return self._make_request(
-            "PUT", url, params, json_data=payload, operation=f"activate Azure resource role at {scope}"
+            "PUT",
+            url,
+            params,
+            json_data=payload,
+            operation=f"activate Azure resource role at {scope}",
         )
 
     def list_assignment_requests(
