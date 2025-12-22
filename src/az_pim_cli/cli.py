@@ -227,27 +227,30 @@ def list_roles(
 ) -> None:
     """List eligible roles."""
     try:
+        from az_pim_cli import ops
         from az_pim_cli.models import alias_to_normalized_role
 
         auth = AzureAuth()
         client = PIMClient(auth, verbose=verbose)
         config = Config()
 
-        console.print("[bold blue]Fetching eligible roles...[/bold blue]")
+        with ops.status("Fetching eligible roles..."):
+            if resource:
+                if not scope:
+                    # Default to current subscription
+                    subscription_id = auth.get_subscription_id()
+                    scope = f"subscriptions/{subscription_id}"
+                else:
+                    # Resolve scope input to full path
+                    scope = resolve_scope_input(scope, auth, client, config)
+
+                roles_data = client.list_resource_role_assignments(scope, limit=limit)
+            else:
+                roles_data = client.list_role_assignments(limit=limit)
 
         if resource:
-            if not scope:
-                # Default to current subscription
-                subscription_id = auth.get_subscription_id()
-                scope = f"subscriptions/{subscription_id}"
-            else:
-                # Resolve scope input to full path
-                scope = resolve_scope_input(scope, auth, client, config)
-
-            roles_data = client.list_resource_role_assignments(scope, limit=limit)
             console.print(f"\n[bold green]Eligible Resource Roles (Scope: {scope})[/bold green]")
         else:
-            roles_data = client.list_role_assignments(limit=limit)
             console.print("\n[bold green]Eligible Azure AD Roles[/bold green]")
 
         # Show backend info in verbose mode
@@ -1095,22 +1098,23 @@ def view_history(
 ) -> None:
     """View activation history."""
     try:
+        from az_pim_cli import ops
+
         auth = AzureAuth()
         client = PIMClient(auth)
         config = Config()
 
-        console.print(f"[bold blue]Fetching activation history (last {days} days)...[/bold blue]")
-
-        if resource:
-            if not scope:
-                subscription_id = auth.get_subscription_id()
-                scope = f"subscriptions/{subscription_id}"
+        with ops.status(f"Fetching activation history (last {days} days)..."):
+            if resource:
+                if not scope:
+                    subscription_id = auth.get_subscription_id()
+                    scope = f"subscriptions/{subscription_id}"
+                else:
+                    # Resolve scope input to full path
+                    scope = resolve_scope_input(scope, auth, client, config)
+                activations = client.list_resource_activation_history(scope=scope, days=days)
             else:
-                # Resolve scope input to full path
-                scope = resolve_scope_input(scope, auth, client, config)
-            activations = client.list_resource_activation_history(scope=scope, days=days)
-        else:
-            activations = client.list_activation_history(days=days)
+                activations = client.list_activation_history(days=days)
 
         if not activations:
             console.print("[yellow]No activation history found.[/yellow]")
