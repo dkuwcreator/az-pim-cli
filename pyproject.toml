@@ -41,9 +41,15 @@ dev = [
     "bandit>=1.7.0",
     "pre-commit>=3.0.0",
     "types-PyYAML>=6.0.0",
+    "types-requests>=2.32.0",
+    "pip-audit>=2.0.0",
 ]
 fuzzy = [
     "rapidfuzz>=3.0.0",
+]
+http = [
+    "httpx>=0.28.0",
+    "tenacity>=9.0.0",
 ]
 
 [project.scripts]
@@ -88,11 +94,43 @@ warn_unused_ignores = true
 warn_no_return = true
 check_untyped_defs = true
 strict_equality = true
+# Allow Any returns temporarily to avoid breaking changes
+disallow_any_explicit = false
+disallow_any_generics = false
 
 [[tool.mypy.overrides]]
 module = [
     "azure.*",
     "rapidfuzz.*",
-    "yaml.*",
 ]
 ignore_missing_imports = true
+
+[tool.bandit]
+exclude_dirs = ["tests", ".venv", "venv"]
+skips = ["B101"]  # Skip assert_used check for tests
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "-ra",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+]
+# Coverage thresholds
+[tool.coverage.run]
+source = ["az_pim_cli"]
+omit = ["tests/*", "setup.py"]
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = false
+# Set to a reasonable threshold - CLI code is hard to test comprehensively
+fail_under = 44

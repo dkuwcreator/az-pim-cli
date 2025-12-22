@@ -411,7 +411,8 @@ def resolve_scope(
             if isinstance(scope, str):
                 return scope
             if isinstance(scope, dict):
-                return scope.get("name", scope.get("id", str(scope)))
+                name_or_id = scope.get("name", scope.get("id", ""))
+                return str(name_or_id) if name_or_id else ""
             return str(scope)
 
         resolved = resolver.resolve(
@@ -423,7 +424,8 @@ def resolve_scope(
         )
 
         if resolved:
-            return extract_scope_name(resolved)
+            result = extract_scope_name(resolved)
+            return result if result is not None else None
 
     return None
 

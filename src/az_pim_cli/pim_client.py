@@ -79,7 +79,7 @@ class PIMClient:
             ParsingError: For response parsing errors
         """
 
-        def do_request():
+        def do_request() -> dict[str, Any]:
             try:
                 if self.verbose:
                     print(f"[DEBUG] {method} {url}")
@@ -126,7 +126,8 @@ class PIMClient:
                 response.raise_for_status()
 
                 try:
-                    return response.json()
+                    json_response: dict[str, Any] = response.json()
+                    return json_response
                 except ValueError as e:
                     raise ParsingError(
                         f"Failed to parse JSON response for {operation}: {str(e)}",
@@ -416,8 +417,8 @@ class PIMClient:
 
         headers = self._get_headers()
         data = self._make_request("GET", url, headers, params, operation="list pending approvals")
-
-        return data.get("value", [])
+        values: list[dict[str, Any]] = data.get("value", [])
+        return values
 
     def approve_request(
         self, request_id: str, justification: str = "Approved via az-pim-cli"
@@ -463,8 +464,8 @@ class PIMClient:
 
         headers = self._get_headers()
         data = self._make_request("GET", url, headers, params, operation="list activation history")
-
-        return data.get("value", [])
+        values: list[dict[str, Any]] = data.get("value", [])
+        return values
 
     def list_resource_activation_history(
         self,
