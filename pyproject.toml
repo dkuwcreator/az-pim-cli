@@ -29,7 +29,7 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "pyyaml>=6.0",
     "rich>=13.0.0",
-    "azure-cli>=2.50.0",
+    "azure-cli>=2.85.0",
 ]
 
 [project.optional-dependencies]
