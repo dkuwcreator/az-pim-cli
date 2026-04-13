@@ -41,7 +41,7 @@ dev = [
     "bandit>=1.7.0",
     "pre-commit>=3.0.0",
     "types-PyYAML>=6.0.0",
-    "types-requests>=2.32.0",
+    "types-requests>=2.33.0.20260408",
     "pip-audit>=2.0.0",
 ]
 fuzzy = [
