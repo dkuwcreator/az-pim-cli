@@ -45,7 +45,7 @@ dev = [
     "pip-audit>=2.0.0",
 ]
 fuzzy = [
-    "rapidfuzz>=3.0.0",
+    "rapidfuzz>=3.14.5",
 ]
 http = [
     "httpx>=0.28.0",
