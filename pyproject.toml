@@ -42,7 +42,7 @@ dev = [
     "pre-commit>=3.0.0",
     "types-PyYAML>=6.0.0",
     "types-requests>=2.32.0",
-    "pip-audit>=2.0.0",
+    "pip-audit>=2.10.0",
 ]
 fuzzy = [
     "rapidfuzz>=3.0.0",
